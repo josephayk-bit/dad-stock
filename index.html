@@ -325,7 +325,19 @@ function chipFor(q){
   const pct = (q.changePct>0?"+":"")+fmt(q.changePct)+"%";
   return `<span class="chip ${cls} num"><span class="arrow">${arrow}</span>${chg}　${pct}</span>`;
 }
-function esc(s){ return (s==null?"":String(s)).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+function stripCites(s){ return typeof s==="string" ? s.replace(/<\/?cite[^>]*>/gi,"").replace(/[ \t]+([,.;:])/g,"$1").replace(/[ \t]{2,}/g," ").trim() : s; }
+function cleanBrief(o){
+  if(!o || typeof o!=="object") return o;
+  const out={};
+  for(const k in o){
+    const v=o[k];
+    if(typeof v==="string") out[k]=stripCites(v);
+    else if(Array.isArray(v)) out[k]=v.map(x=> typeof x==="string"?stripCites(x):(x&&typeof x==="object"?cleanBrief(x):x));
+    else out[k]=v;
+  }
+  return out;
+}
+function esc(s){ return (s==null?"":String(s)).replace(/<\/?cite[^>]*>/gi,"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
 function sec(label, body){ return body?`<div class="sec"><div class="dlabel">${label}</div>${body}</div>`:""; }
 function detailHTML(c){
   const t=T[lang];
@@ -474,7 +486,7 @@ async function loadBrief(c, L){
   try{
     const obj = await apiBrief(m.code, m.en, L);
     if(!briefs[c]) briefs[c]={};
-    if(obj && !obj.error){ briefs[c][L]=obj; await sset("brief_"+c+"_"+L, obj); }
+    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("brief_"+c+"_"+L, cb); }
     else { briefs[c][L]={error:true, reason:(obj&&obj.reason)||null}; }
   }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
   if(openCode===c && lang===L) renderList();
@@ -489,7 +501,7 @@ async function loadBrief(c, L){
   lastUpdated = (await sget("lastUpdated")) || null;
   for(const c of watchlist){
     const n=await sget("note_"+c); if(n) notes[c]=n;
-    for(const L of ["zh","en"]){ const b=await sget("brief_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=b; } }
+    for(const L of ["zh","en"]){ const b=await sget("brief_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
   }
   applyStaticText(); renderList(); renderPicker();
   refreshQuotes();   // pull fresh prices on open
