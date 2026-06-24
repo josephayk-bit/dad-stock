@@ -24,11 +24,18 @@ module.exports = async function handler(req, res) {
 `Use web search to research the SGX-listed company ${name} (SGX code ${code}). Write ALL text values in ${langName}.
 Return ONLY a JSON object, no markdown, with keys:
 "business" (1-3 sentences: what it does / main business segments),
+"people" (array of up to 4 {"role":"Chairman / CEO / Major shareholder / etc","name":"name, with stake % if a shareholder"}; the key appointment holders AND the controlling or substantial shareholders — important for a small-cap investor),
 "results" (latest reported revenue and net profit with year-on-year change, 1-2 sentences),
 "earnings3y" (array of the last 3 fiscal years, newest first, each {"year":"FY2025","revenue":"S$13.9B","profit":"S$7.3B"}; use null fields if unknown),
 "dividend" (latest dividend per share and approximate yield in 1 sentence; null if none),
+"divtrack" (one short phrase on dividend track record if notable, e.g. "Paid dividends 12 years running"; null),
+"keydates" (next ex-dividend date and/or AGM date if known; short; null),
 "outlook" (management guidance or sector outlook, 1-2 sentences),
 "analyst" (a brief factual summary of recent analyst/broker ratings or target prices that have been publicly reported, e.g. "Several brokers rate it Buy, average target ~S$X"; report what analysts say, do NOT give your own recommendation; null if none found),
+"insider" (any recent director or substantial-shareholder buying or selling that has been publicly disclosed, 1 sentence; null if none),
+"navps" (net asset value / book value per share, short string like "S$1.85"; null if unknown),
+"pb" (price-to-book ratio, e.g. "0.8"; null),
+"netcash" (net cash or net debt position in one short phrase, e.g. "Net cash S$45m" or "Net debt S$120m"; null),
 "pros" (array of 2-4 short factual positives),
 "risks" (array of 2-4 short factual risks),
 "mktcap","pe","yield","range52" (short strings, e.g. "S$130B" / "11.2" / "5.8%" / "38.10 - 48.90"; null if unknown).
@@ -44,7 +51,7 @@ Stay factual. Do NOT give buy, sell, or hold recommendations of your own.`;
       },
       body: JSON.stringify({
         model,
-        max_tokens: 1600,
+        max_tokens: 1900,
         messages: [{ role: "user", content: prompt }],
         tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }]
       })

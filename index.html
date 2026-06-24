@@ -157,6 +157,11 @@
   .erow.ehead{order:-1;color:var(--ink-soft);font-size:12px;font-weight:700;letter-spacing:.04em}
   .erow .ey{flex:0 0 70px;font-weight:700;font-family:var(--font-num)}
   .erow .ev{flex:1;text-align:right;font-family:var(--font-num)}
+  .people{margin-top:6px;display:flex;flex-direction:column}
+  .prow{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+  .prow:last-child{border-bottom:0}
+  .prow .prole{color:var(--ink-soft);flex:0 0 auto}
+  .prow .pname{font-weight:700;text-align:right}
   .picklist{overflow-y:auto;padding:4px 12px 24px;-webkit-overflow-scrolling:touch}
   .pick{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper);
         border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:8px 0;min-height:66px}
@@ -268,6 +273,8 @@ const T = {
       business:"Business",results:"Latest results",dividend:"Dividend",outlook:"Outlook",news:"Recent news",
       pros:"In its favour",risks:"Watch-outs",yourtake:"Your note for Dad",
       earnings3y:"Last 3 years",revenue:"Revenue",netprofit:"Net profit",analyst:"Analyst views",
+      people:"Key people & owners",pb:"P/B",navps:"NAV/share",netcash:"Cash position",
+      insider:"Insider / shareholder moves",keydates:"Key dates",
       photoAdd:"Add by photo",reading:"Reading the photo…",photoNone:"No stocks found in that photo",addAll:"Add all",
       newsLoading:"Checking the latest…",noNews:"No recent news found",
       notePh:"Add your own view — it goes into the note you send.",
@@ -288,6 +295,8 @@ const T = {
       business:"业务",results:"最新业绩",dividend:"股息",outlook:"前景展望",news:"最新消息",
       pros:"优点",risks:"风险",yourtake:"我给爸爸的看法",
       earnings3y:"近三年业绩",revenue:"营收",netprofit:"净利",analyst:"分析师观点",
+      people:"主要人物与大股东",pb:"市净率",navps:"每股净资产",netcash:"现金状况",
+      insider:"内部人 / 大股东动向",keydates:"重要日期",
       photoAdd:"拍照添加",reading:"正在识别照片…",photoNone:"照片中没有识别到股票",addAll:"全部添加",
       newsLoading:"正在查看最新消息…",noNews:"暂无最新消息",
       notePh:"写下你自己的看法 —— 会一起放进要发送的简报里。",
@@ -338,7 +347,9 @@ function joinText(data){ return (data.content||[]).filter(b=>b.type==="text").ma
 
 /* ---------- backend (your own Vercel functions) ---------- */
 async function apiQuotes(codes){
-  const res = await fetch("/api/quotes?codes="+encodeURIComponent(codes.join(",")));
+  const names={}; codes.forEach(c=>{ names[c]=meta(c).en; });
+  const res = await fetch("/api/quotes",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({codes,names})});
   if(!res.ok) throw new Error("quotes "+res.status);
   return res.json();   // -> [{code,price,change,changePct,ccy}]
 }
@@ -436,15 +447,22 @@ function detailHTML(c){
        `<div class="erow ehead"><span class="ey"></span><span class="ev">${t.revenue}</span><span class="ev">${t.netprofit}</span></div>`+
        `</div></div>`;
   }
-  h+=sec(t.dividend,b.dividend?p(b.dividend):"");
-  h+=sec(t.outlook, b.outlook ?p(b.outlook) :"");
-  h+=sec(t.analyst, b.analyst ?p(b.analyst) :"");
-  h+=`<div class="stats">
-        <div class="stat"><div class="k">${t.mktcap}</div><div class="v">${esc(b.mktcap)||t.dash}</div></div>
-        <div class="stat"><div class="k">${t.pe}</div><div class="v">${esc(b.pe)||t.dash}</div></div>
-        <div class="stat"><div class="k">${t.yield}</div><div class="v">${esc(b.yield)||t.dash}</div></div>
-        <div class="stat"><div class="k">${t.range52}</div><div class="v">${esc(b.range52)||t.dash}</div></div>
-      </div>`;
+  if(Array.isArray(b.people)&&b.people.length){
+    h+=`<div class="sec"><div class="dlabel">${t.people}</div><div class="people">`+
+       b.people.map(pp=>`<div class="prow"><span class="prole">${esc(pp.role)}</span><span class="pname">${esc(pp.name)}</span></div>`).join("")+
+       `</div></div>`;
+  }
+  h+=sec(t.dividend, b.dividend?(p(b.dividend)+(b.divtrack?`<p class="muted">${esc(b.divtrack)}</p>`:"")):"");
+  h+=sec(t.keydates, b.keydates?p(b.keydates):"");
+  h+=sec(t.outlook,  b.outlook ?p(b.outlook) :"");
+  h+=sec(t.analyst,  b.analyst ?p(b.analyst) :"");
+  h+=sec(t.insider,  b.insider ?p(b.insider) :"");
+  const stat=(k,v)=>`<div class="stat"><div class="k">${k}</div><div class="v">${esc(v)||t.dash}</div></div>`;
+  let tiles=stat(t.mktcap,b.mktcap)+stat(t.pe,b.pe)+stat(t.yield,b.yield)+stat(t.range52,b.range52);
+  if(b.pb) tiles+=stat(t.pb,b.pb);
+  if(b.navps) tiles+=stat(t.navps,b.navps);
+  if(b.netcash) tiles+=stat(t.netcash,b.netcash);
+  h+=`<div class="stats">${tiles}</div>`;
   // latest news — always live, dated, tappable (separate from the cached briefing)
   const nd=newsData[c], items=(nd&&nd.items)||[];
   let newsInner;
@@ -500,8 +518,17 @@ function setLang(l){ lang=l; sset("lang",l); applyStaticText(); renderList(); re
 async function toggleCard(c){
   if(openCode===c){ openCode=null; renderList(); return; }
   openCode=c; renderList();
+  refreshOne(c);                                  // make the price current at open
   if(!(briefs[c]&&briefs[c][lang])) loadBrief(c,lang);
   loadNews(c);
+}
+async function refreshOne(c){
+  try{
+    const arr=await apiQuotes([c]);
+    if(Array.isArray(arr)) arr.forEach(o=>{ if(o&&o.code&&o.price!=null){ quotes[o.code]={price:o.price,change:o.change,changePct:o.changePct,ccy:o.ccy||"SGD"}; }});
+    lastUpdated=Date.now(); dataError=false; await sset("quotes",quotes); await sset("lastUpdated",lastUpdated);
+    renderList(); updateStatus();
+  }catch(e){}
 }
 async function removeStock(c){
   watchlist=watchlist.filter(x=>x!==c);
@@ -635,7 +662,7 @@ async function loadBrief(c, L){
   try{
     const obj = await apiBrief(m.code, m.en, L);
     if(!briefs[c]) briefs[c]={};
-    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("brief_"+c+"_"+L, cb); }
+    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv2_"+c+"_"+L, cb); }
     else { briefs[c][L]={error:true, reason:(obj&&obj.reason)||null}; }
   }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
   if(openCode===c && lang===L) renderList();
@@ -660,7 +687,7 @@ async function loadNews(c, force){
   lastUpdated = (await sget("lastUpdated")) || null;
   for(const c of watchlist){
     const n=await sget("note_"+c); if(n) notes[c]=n;
-    for(const L of ["zh","en"]){ const b=await sget("brief_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
+    for(const L of ["zh","en"]){ const b=await sget("briefv2_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
   }
   applyStaticText(); renderList(); renderPicker();
   refreshQuotes();   // pull fresh prices on open
