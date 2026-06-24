@@ -11,9 +11,16 @@ dad-stocks-app/
 ├── index.html        the app (what your dad sees)
 ├── api/
 │   ├── quotes.js      fetches SGX prices (Yahoo feed, server-side, no key)
-│   └── brief.js       writes the company briefings (uses YOUR Anthropic key)
+│   ├── brief.js       writes the company briefings (uses YOUR Anthropic key)
+│   ├── find.js        searches the whole SGX universe by name/code/voice (uses your key)
+│   ├── photo.js       reads stock names from a photo / CDP statement (uses your key)
+│   └── news.js        pulls the latest dated news per counter, with source links (uses your key)
 └── README.md          this guide
 ```
+
+Three ways to add a counter: type it, tap **🎤** and say the name (English or Chinese), or tap **📷 Add by photo** to snap a CDP statement / handwritten list and add the holdings it finds (with an "Add all"). On your dad's home-screen app, the most reliable mic is the **iPad keyboard's own 🎤** (tap the box first, then the keyboard mic).
+
+Each briefing shows the **last 3 years' earnings** and any **analyst/professional views** publicly reported. The **Recent news** section is always pulled live, shows the date and source, and you can tap a headline to open the article — tap **↻** to re-check the very latest. So when he hears something, he can open the counter and verify it himself.
 
 You don't need to edit any code to get it running. Editing is only for customizing later (see the end).
 

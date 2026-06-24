@@ -84,6 +84,17 @@
   .news li{padding:9px 0;border-bottom:1px solid var(--line);font-size:15px;line-height:1.45}
   .news li:last-child{border-bottom:0}
   .news .date{color:var(--gold);font-weight:700;font-size:13px;font-family:var(--font-num);margin-right:8px}
+  .news .src{color:var(--ink-soft);font-size:13px}
+  .newslink{color:var(--ink);text-decoration:none;display:block}
+  .newslink .ext{color:var(--jade);font-weight:700}
+  .newslink:active{opacity:.6}
+  .newshead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .newsrefresh{appearance:none;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);
+               font-family:var(--font-base);font-size:13px;font-weight:600;padding:7px 11px;border-radius:10px;
+               min-height:38px;display:inline-flex;align-items:center;gap:6px}
+  .newsrefresh:active{background:var(--press)}
+  .newsrefresh.spin .ic{display:inline-block;animation:spin .8s linear infinite}
+  .newsloading{padding:12px 2px;color:var(--ink-soft);font-size:15px}
   .prcons{margin-top:5px;display:flex;flex-direction:column;gap:6px}
   .prcons div{font-size:15px;line-height:1.45}
   .noteinput{width:100%;min-height:78px;border:1px solid var(--line);border-radius:12px;background:var(--ivory);
@@ -123,9 +134,29 @@
   .done{appearance:none;border:0;background:transparent;color:var(--jade);font-family:var(--font-base);
         font-size:17px;font-weight:700;padding:8px 6px;min-height:44px}
   .searchwrap{padding:0 18px 10px}
-  .search{width:100%;min-height:52px;border:1px solid var(--line);border-radius:14px;background:var(--paper);
+  .searchrow{display:flex;gap:8px;align-items:center}
+  .search{flex:1;min-width:0;min-height:52px;border:1px solid var(--line);border-radius:14px;background:var(--paper);
           font-family:var(--font-base);font-size:17px;padding:0 16px;color:var(--ink)}
   .search::placeholder{color:var(--ink-soft)}
+  .micbtn{flex:none;width:54px;height:52px;border:1px solid var(--line);border-radius:14px;background:var(--paper);
+          font-size:23px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .micbtn:active{background:var(--press)}
+  .micbtn.listening{background:var(--gain);color:#fff;border-color:var(--gain)}
+  .searchtip{font-size:13px;color:var(--ink-soft);margin-top:9px;line-height:1.45}
+  .photobtn{width:100%;min-height:56px;margin-bottom:12px;border:1px dashed var(--gold);border-radius:14px;
+            background:var(--paper);color:var(--gold);font-family:var(--font-base);font-size:17px;font-weight:700;
+            display:flex;align-items:center;justify-content:center;gap:8px}
+  .photobtn:active{background:var(--press)}
+  .addallbtn{width:100%;min-height:48px;margin:8px 0;border:0;border-radius:12px;background:var(--jade);
+             color:#fff;font-family:var(--font-base);font-size:16px;font-weight:700}
+  .addallbtn:active{filter:brightness(.93)}
+  .finding{padding:16px 6px;color:var(--ink-soft);font-size:15px;text-align:center}
+  .earn{margin-top:6px;display:flex;flex-direction:column}
+  .erow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
+  .erow:last-child{border-bottom:0}
+  .erow.ehead{order:-1;color:var(--ink-soft);font-size:12px;font-weight:700;letter-spacing:.04em}
+  .erow .ey{flex:0 0 70px;font-weight:700;font-family:var(--font-num)}
+  .erow .ev{flex:1;text-align:right;font-family:var(--font-num)}
   .picklist{overflow-y:auto;padding:4px 12px 24px;-webkit-overflow-scrolling:touch}
   .pick{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper);
         border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:8px 0;min-height:66px}
@@ -173,7 +204,13 @@
     <button class="done" onclick="closeSheet()" id="t-done"></button>
   </div>
   <div class="searchwrap">
-    <input class="search" id="search" oninput="renderPicker()" autocomplete="off">
+    <button class="photobtn" id="t-photobtn" onclick="document.getElementById('photoInput').click()"></button>
+    <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="onPhoto(event)">
+    <div class="searchrow">
+      <input class="search" id="search" oninput="onSearchInput()" autocomplete="off" enterkeyhint="search">
+      <button class="micbtn" id="micbtn" onclick="micTap()" aria-label="speak">🎤</button>
+    </div>
+    <div class="searchtip" id="t-searchtip"></div>
   </div>
   <div class="picklist" id="picklist"></div>
 </div>
@@ -222,11 +259,17 @@ const T = {
   en:{title:"Dad's Stocks",subtitle:"Singapore watchlist",refresh:"Refresh",
       updated:"Updated",updating:"Updating prices…",neverUpdated:"Tap refresh for prices",
       add:"Add stock",addtitle:"Add a stock",done:"Done",search:"Search name or code",
+      searchHint:"Speak or type a name or code",
+      searchTip:"Tip: tap the box, then the 🎤 on the keyboard to speak — it understands Chinese too.",
+      searching:"Searching all of SGX…",noMatches:"No match — try another name",
       about:"About",stats:"Key figures",mktcap:"Market cap",pe:"P/E",yield:"Dividend yield",
       range52:"52-week range",remove:"Remove from list",empty:"No stocks yet.\nTap “Add stock” to begin.",
       loading:"Loading…",dash:"—",pricenote:"Prices are indicative and may be delayed.",inlist:"Added",
       business:"Business",results:"Latest results",dividend:"Dividend",outlook:"Outlook",news:"Recent news",
       pros:"In its favour",risks:"Watch-outs",yourtake:"Your note for Dad",
+      earnings3y:"Last 3 years",revenue:"Revenue",netprofit:"Net profit",analyst:"Analyst views",
+      photoAdd:"Add by photo",reading:"Reading the photo…",photoNone:"No stocks found in that photo",addAll:"Add all",
+      newsLoading:"Checking the latest…",noNews:"No recent news found",
       notePh:"Add your own view — it goes into the note you send.",
       makeNote:"Make a note to send",copy:"Copy text",copied:"Copied ✓",
       notAdvice:"For reference only — not investment advice.",gettingInfo:"Getting the latest…",
@@ -236,11 +279,17 @@ const T = {
   zh:{title:"爸爸的股票",subtitle:"新加坡自选股",refresh:"刷新",
       updated:"更新于",updating:"正在更新价格…",neverUpdated:"点击刷新获取价格",
       add:"添加股票",addtitle:"添加股票",done:"完成",search:"搜索名称或代码",
+      searchHint:"说出或输入名称、代码",
+      searchTip:"提示：点击输入框，再点键盘上的 🎤 即可语音输入（支持中文）。",
+      searching:"正在搜索全部新交所股票…",noMatches:"找不到 —— 换个名称再试",
       about:"公司简介",stats:"主要数据",mktcap:"市值",pe:"市盈率",yield:"股息率",
       range52:"52周区间",remove:"从列表移除",empty:"还没有股票。\n点击“添加股票”开始。",
       loading:"加载中…",dash:"—",pricenote:"价格仅供参考，可能有延迟。",inlist:"已添加",
       business:"业务",results:"最新业绩",dividend:"股息",outlook:"前景展望",news:"最新消息",
       pros:"优点",risks:"风险",yourtake:"我给爸爸的看法",
+      earnings3y:"近三年业绩",revenue:"营收",netprofit:"净利",analyst:"分析师观点",
+      photoAdd:"拍照添加",reading:"正在识别照片…",photoNone:"照片中没有识别到股票",addAll:"全部添加",
+      newsLoading:"正在查看最新消息…",noNews:"暂无最新消息",
       notePh:"写下你自己的看法 —— 会一起放进要发送的简报里。",
       makeNote:"生成简报（发给爸爸）",copy:"复制全文",copied:"已复制 ✓",
       notAdvice:"仅供参考，非投资建议。",gettingInfo:"正在获取最新资料…",
@@ -258,16 +307,27 @@ let notes  = {};             // code -> your own note string (included when you 
 let lastUpdated = null;
 let openCode = null;
 let dataError = false;       // true when a live fetch fails (e.g. static preview)
+let custom = {};             // code -> {en,zh} for stocks added via search (not in LIBRARY)
+let findResults = [];        // remote search / photo candidates
+let findBusy = false, findTimer = null, lastQuery = "";
+let photoBusy = false, pickMsg = "";
+let newsData = {};           // code -> {items:[...], at:timestamp}  (live, not cached to disk)
+let newsBusy = {};           // code -> bool
 
 /* ---------- storage (localStorage on your deployed site) ---------- */
 async function sget(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return null; } }
 async function sset(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 
 /* ---------- helpers ---------- */
-const meta = c => LIBRARY.find(x=>x.code===c) || {code:c,en:c,zh:c};
+function meta(c){
+  const lib=LIBRARY.find(x=>x.code===c); if(lib) return lib;
+  if(custom[c]) return {code:c, en:custom[c].en||c, zh:custom[c].zh||custom[c].en||c};
+  return {code:c, en:c, zh:c};
+}
 function nameMain(c){ const m=meta(c); return lang==="zh"?m.zh:m.en; }
 function nameSub(c){ const m=meta(c); return (lang==="zh"?m.en:m.zh)+" · "+m.code; }
 function fmt(n,d=2){ return (n==null||isNaN(n))?T[lang].dash:Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function hhmm(ts){ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
 function extractJSON(text, arr){
   if(!text) return null;
   const o=arr?text.indexOf("["):text.indexOf("{"); const c=arr?text.lastIndexOf("]"):text.lastIndexOf("}");
@@ -288,6 +348,24 @@ async function apiBrief(code,name,L){
   if(!res.ok) throw new Error("brief "+res.status);
   return res.json();   // -> {business,...} or {error:true, reason:"no_key"|...}
 }
+async function apiFind(q,L){
+  const res = await fetch("/api/find",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({q,lang:L})});
+  if(!res.ok) throw new Error("find "+res.status);
+  return res.json();   // -> [{code,en,zh}]
+}
+async function apiPhoto(base64,mediaType,L){
+  const res = await fetch("/api/photo",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({image:base64, mediaType, lang:L})});
+  if(!res.ok) throw new Error("photo "+res.status);
+  return res.json();   // -> [{code,en,zh}]
+}
+async function apiNews(code,name,L){
+  const res = await fetch("/api/news",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({code,name,lang:L})});
+  if(!res.ok) throw new Error("news "+res.status);
+  return res.json();   // -> [{date,headline,source,url}]
+}
 
 /* ---------- render ---------- */
 function applyStaticText(){
@@ -299,7 +377,9 @@ function applyStaticText(){
   document.getElementById("t-addtitle").textContent=t.addtitle;
   document.getElementById("t-done").textContent=t.done;
   document.getElementById("t-pricenote").textContent=t.pricenote;
-  document.getElementById("search").placeholder=t.search;
+  document.getElementById("search").placeholder=t.searchHint;
+  document.getElementById("t-searchtip").textContent=t.searchTip;
+  document.getElementById("t-photobtn").textContent="📷 "+t.photoAdd;
   document.getElementById("lang-zh").classList.toggle("on",lang==="zh");
   document.getElementById("lang-en").classList.toggle("on",lang==="en");
   document.documentElement.lang = lang==="zh"?"zh-Hans":"en";
@@ -349,60 +429,45 @@ function detailHTML(c){
   let h="";
   h+=sec(t.about,   b.business?p(b.business):"");
   h+=sec(t.results, b.results ?p(b.results) :"");
+  if(Array.isArray(b.earnings3y)&&b.earnings3y.length){
+    h+=`<div class="sec"><div class="dlabel">${t.earnings3y}</div><div class="earn">`+
+       b.earnings3y.map(e=>`<div class="erow"><span class="ey">${esc(e.year)}</span>`+
+         `<span class="ev">${esc(e.revenue)||t.dash}</span><span class="ev">${esc(e.profit)||t.dash}</span></div>`).join("")+
+       `<div class="erow ehead"><span class="ey"></span><span class="ev">${t.revenue}</span><span class="ev">${t.netprofit}</span></div>`+
+       `</div></div>`;
+  }
   h+=sec(t.dividend,b.dividend?p(b.dividend):"");
   h+=sec(t.outlook, b.outlook ?p(b.outlook) :"");
+  h+=sec(t.analyst, b.analyst ?p(b.analyst) :"");
   h+=`<div class="stats">
         <div class="stat"><div class="k">${t.mktcap}</div><div class="v">${esc(b.mktcap)||t.dash}</div></div>
         <div class="stat"><div class="k">${t.pe}</div><div class="v">${esc(b.pe)||t.dash}</div></div>
         <div class="stat"><div class="k">${t.yield}</div><div class="v">${esc(b.yield)||t.dash}</div></div>
         <div class="stat"><div class="k">${t.range52}</div><div class="v">${esc(b.range52)||t.dash}</div></div>
       </div>`;
-  if(Array.isArray(b.news)&&b.news.length){
-    h+=`<div class="sec"><div class="dlabel">${t.news}</div><ul class="news">`+
-       b.news.map(n=>`<li><span class="date">${esc(n.date)}</span>${esc(n.headline)}</li>`).join("")+`</ul></div>`;
-  }
+  // latest news — always live, dated, tappable (separate from the cached briefing)
+  const nd=newsData[c], items=(nd&&nd.items)||[];
+  let newsInner;
+  if(newsBusy[c] && !items.length) newsInner=`<div class="newsloading">${t.newsLoading}</div>`;
+  else if(items.length){
+    newsInner=`<ul class="news">`+ items.map(n=>{
+      const inner=`<span class="date">${esc(n.date)}</span>${esc(n.headline)}`+(n.source?` <span class="src">· ${esc(n.source)}</span>`:"");
+      return n.url ? `<li><a class="newslink" href="${esc(n.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${inner} <span class="ext">↗</span></a></li>`
+                   : `<li>${inner}</li>`;
+    }).join("") + `</ul>`;
+  } else newsInner=`<div class="newsloading muted">${t.noNews}</div>`;
+  const asOf = nd&&nd.at ? `${t.updated} ${hhmm(nd.at)}` : t.refresh;
+  h+=`<div class="sec">
+        <div class="newshead">
+          <div class="dlabel">${t.news}</div>
+          <button class="newsrefresh ${newsBusy[c]?'spin':''}" onclick="event.stopPropagation();loadNews('${c}',true)"><span class="ic">↻</span> ${asOf}</button>
+        </div>${newsInner}
+      </div>`;
   const list=(arr,icon)=> (Array.isArray(arr)&&arr.length)?`<div class="prcons">`+arr.map(x=>`<div>${icon} ${esc(x)}</div>`).join("")+`</div>`:"";
   h+=sec(t.pros, list(b.pros,"✅"));
   h+=sec(t.risks,list(b.risks,"⚠️"));
-  h+=`<div class="sec"><div class="dlabel">${t.yourtake}</div>
-        <textarea class="noteinput" placeholder="${t.notePh}" onclick="event.stopPropagation()"
-          oninput="saveNote('${c}',this.value)">${esc(notes[c]||"")}</textarea></div>`;
-  h+=`<button class="makebtn" onclick="event.stopPropagation();makeNote('${c}')">✉️ ${t.makeNote}</button>`;
-  h+=`<div id="share-${c}"></div>`;
   h+=removeBtn;
   return h;
-}
-function saveNote(c,val){ notes[c]=val; sset("note_"+c,val); }
-function noteText(c){
-  const t=T[lang], m=meta(c), b=(briefs[c]||{})[lang]||{}, q=quotes[c]||{};
-  const L=[];
-  L.push(`${lang==="zh"?m.zh:m.en}（SGX: ${m.code}）`);
-  if(q.price!=null) L.push(`${lang==="zh"?"现价":"Price"}: ${q.ccy||"SGD"} ${fmt(q.price)}`+(q.changePct!=null?`（${q.changePct>0?"+":""}${fmt(q.changePct)}%）`:""));
-  if(b.business) L.push(`【${t.business}】\n${b.business}`);
-  if(b.results)  L.push(`【${t.results}】\n${b.results}`);
-  if(b.dividend) L.push(`【${t.dividend}】\n${b.dividend}`);
-  if(b.outlook)  L.push(`【${t.outlook}】\n${b.outlook}`);
-  if(Array.isArray(b.news)&&b.news.length)  L.push(`【${t.news}】\n`+b.news.map(n=>`• ${n.date?("("+n.date+") "):""}${n.headline}`).join("\n"));
-  if(Array.isArray(b.pros)&&b.pros.length)  L.push(`【${t.pros}】\n`+b.pros.map(x=>`✅ ${x}`).join("\n"));
-  if(Array.isArray(b.risks)&&b.risks.length)L.push(`【${t.risks}】\n`+b.risks.map(x=>`⚠️ ${x}`).join("\n"));
-  if(notes[c]&&notes[c].trim()) L.push(`【${t.yourtake}】\n${notes[c].trim()}`);
-  L.push(`—— ${t.notAdvice}`);
-  return L.join("\n\n");
-}
-function makeNote(c){
-  const t=T[lang], host=document.getElementById("share-"+c); if(!host) return;
-  host.innerHTML=`<div class="sharebox">
-      <textarea class="sharetext" id="st-${c}" onclick="event.stopPropagation()">${esc(noteText(c))}</textarea>
-      <button class="copybtn" onclick="event.stopPropagation();copyNote('${c}',this)">${t.copy}</button>
-    </div>`;
-}
-function copyNote(c,btn){
-  const t=T[lang], ta=document.getElementById("st-"+c); if(!ta) return;
-  const done=()=>{ btn.textContent=t.copied; setTimeout(()=>btn.textContent=t.copy,1600); };
-  try{
-    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value).then(done,()=>{ta.focus();ta.select();done();}); }
-    else { ta.focus(); ta.select(); try{document.execCommand("copy");}catch(e){} done(); }
-  }catch(e){ ta.focus(); ta.select(); done(); }
 }
 function renderList(){
   const t=T[lang], host=document.getElementById("list");
@@ -436,6 +501,7 @@ async function toggleCard(c){
   if(openCode===c){ openCode=null; renderList(); return; }
   openCode=c; renderList();
   if(!(briefs[c]&&briefs[c][lang])) loadBrief(c,lang);
+  loadNews(c);
 }
 async function removeStock(c){
   watchlist=watchlist.filter(x=>x!==c);
@@ -443,29 +509,112 @@ async function removeStock(c){
   await sset("watchlist",watchlist);
   renderList(); renderPicker();
 }
-async function addStock(c){
+async function addStock(c, names){
   if(watchlist.includes(c)) return;
+  if(names && !LIBRARY.find(x=>x.code===c)){
+    custom[c]={en:names.en||c, zh:names.zh||names.en||c}; await sset("custom",custom);
+  }
   watchlist.push(c);
   await sset("watchlist",watchlist);
   renderList(); renderPicker();
   if(!quotes[c]) refreshQuotes();
 }
+function addFromFind(i){ const x=findResults[i]; if(x) addStock(x.code,{en:x.en,zh:x.zh}); }
+async function addAll(){
+  let added=false;
+  for(const x of (findResults||[])){
+    if(!x||watchlist.includes(x.code)) continue;
+    if(!LIBRARY.find(l=>l.code===x.code)){ custom[x.code]={en:x.en||x.code, zh:x.zh||x.en||x.code}; }
+    watchlist.push(x.code); added=true;
+  }
+  if(added){ await sset("watchlist",watchlist); await sset("custom",custom); renderList(); renderPicker(); refreshQuotes(); }
+}
 
-/* ---------- sheet ---------- */
-function openSheet(){ document.getElementById("search").value=""; renderPicker();
+/* ---------- add by photo (CDP statement, handwritten list, etc.) ---------- */
+function fileToScaled(file, maxDim=1500, quality=0.72){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ let w=img.width,h=img.height; const s=Math.min(1,maxDim/Math.max(w,h));
+      w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s));
+      const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+      cv.getContext("2d").drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+      resolve(cv.toDataURL("image/jpeg",quality)); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error("img")); };
+    img.src=url;
+  });
+}
+async function onPhoto(ev){
+  const file=ev.target.files&&ev.target.files[0]; ev.target.value="";
+  if(!file) return;
+  photoBusy=true; findResults=[]; pickMsg=""; document.getElementById("search").value=""; renderPicker();
+  try{
+    const dataUrl=await fileToScaled(file);
+    const base64=dataUrl.split(",")[1];
+    const arr=await apiPhoto(base64,"image/jpeg",lang);
+    findResults=Array.isArray(arr)?arr.filter(x=>x&&x.code):[];
+    pickMsg=findResults.length?"":T[lang].photoNone;
+  }catch(e){ pickMsg=T[lang].photoNone; }
+  photoBusy=false; renderPicker();
+}
+
+/* ---------- sheet + search ---------- */
+function openSheet(){ document.getElementById("search").value=""; findResults=[]; findBusy=false; photoBusy=false; pickMsg=""; renderPicker();
   document.getElementById("sheetBg").classList.add("open"); document.getElementById("sheet").classList.add("open"); }
-function closeSheet(){ document.getElementById("sheetBg").classList.remove("open"); document.getElementById("sheet").classList.remove("open"); }
+function closeSheet(){ clearTimeout(findTimer); document.getElementById("sheetBg").classList.remove("open"); document.getElementById("sheet").classList.remove("open"); }
+
+function onSearchInput(){
+  pickMsg="";
+  renderPicker();                                   // instant local filtering
+  const q=(document.getElementById("search").value||"").trim();
+  clearTimeout(findTimer);
+  if(q.length>=2){ findTimer=setTimeout(()=>doFind(q),550); }   // then search all SGX
+  else { findResults=[]; findBusy=false; renderPicker(); }
+}
+async function doFind(q){
+  lastQuery=q; findBusy=true; renderPicker();
+  try{ const arr=await apiFind(q,lang); if(q===lastQuery && Array.isArray(arr)) findResults=arr.filter(x=>x&&x.code); }
+  catch(e){}
+  if(q===lastQuery){ findBusy=false; renderPicker(); }
+}
+function micTap(){
+  const inp=document.getElementById("search");
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone;
+  if(SR && !standalone){
+    try{
+      const r=new SR(); r.lang = lang==="zh" ? "zh-CN" : "en-SG"; r.interimResults=false; r.maxAlternatives=1;
+      const btn=document.getElementById("micbtn"); btn.classList.add("listening");
+      r.onresult=e=>{ inp.value=e.results[0][0].transcript; onSearchInput(); };
+      r.onerror=()=>{ try{inp.focus();}catch(_){} };
+      r.onend=()=>{ btn.classList.remove("listening"); };
+      r.start(); return;
+    }catch(e){}
+  }
+  inp.focus();   // pops the iPad keyboard so its built-in 🎤 can be used (works in the home-screen app)
+}
+
 function renderPicker(){
-  const t=T[lang], q=(document.getElementById("search").value||"").trim().toLowerCase();
-  const rows = LIBRARY.filter(x=> !q || x.en.toLowerCase().includes(q)||x.zh.includes(q)||x.code.toLowerCase().includes(q));
-  document.getElementById("picklist").innerHTML = rows.map(x=>{
+  const t=T[lang], qraw=(document.getElementById("search").value||"").trim(), q=qraw.toLowerCase();
+  const localRows = LIBRARY.filter(x=> !q || x.en.toLowerCase().includes(q)||x.zh.includes(q)||x.code.toLowerCase().includes(q));
+  const localCodes = new Set(localRows.map(x=>x.code));
+  const remoteRows = (findResults||[]).filter(x=> x && !localCodes.has(x.code));
+  const row = (x, addCall) => {
     const inList = watchlist.includes(x.code);
     return `<div class="pick ${inList?'in':''}">
-      <div><div class="pn">${lang==="zh"?x.zh:x.en}</div>
-           <div class="ps">${(lang==="zh"?x.en:x.zh)} · ${x.code}</div></div>
-      <button class="pickadd" onclick="addStock('${x.code}')" ${inList?'disabled':''}>${inList?t.inlist:'＋'}</button>
+      <div><div class="pn">${esc(lang==="zh"?(x.zh||x.en):(x.en||x.zh))}</div>
+           <div class="ps">${esc((lang==="zh"?(x.en||x.zh):(x.zh||x.en))||"")} · ${esc(x.code)}</div></div>
+      <button class="pickadd" onclick="${inList?'':addCall}" ${inList?'disabled':''}>${inList?t.inlist:'＋'}</button>
     </div>`;
-  }).join("") || `<div class="empty">${t.dash}</div>`;
+  };
+  let html = localRows.map(x=> row(x, `addStock('${x.code}')`)).join("");
+  if(remoteRows.length>1 && remoteRows.some(x=>!watchlist.includes(x.code))){
+    html += `<button class="addallbtn" onclick="addAll()">＋ ${t.addAll} (${remoteRows.length})</button>`;
+  }
+  html += remoteRows.map(x=> row(x, `addFromFind(${findResults.indexOf(x)})`)).join("");
+  if(photoBusy) html += `<div class="finding">${t.reading}</div>`;
+  else if(findBusy) html += `<div class="finding">${t.searching}</div>`;
+  if(!html.trim()) html = `<div class="empty">${photoBusy?t.reading:(pickMsg||(qraw?t.noMatches:t.dash))}</div>`;
+  document.getElementById("picklist").innerHTML = html;
 }
 
 /* ---------- data fetch ---------- */
@@ -491,13 +640,23 @@ async function loadBrief(c, L){
   }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
   if(openCode===c && lang===L) renderList();
 }
-
-/* ---------- boot ---------- */
+async function loadNews(c, force){
+  const nd=newsData[c];
+  if(!force && nd && (Date.now()-nd.at < 20*60*1000)) return;   // already fresh (<20 min)
+  newsBusy[c]=true; if(openCode===c) renderList();
+  try{
+    const m=meta(c);
+    const items=await apiNews(m.code, m.en, lang);
+    newsData[c]={items:Array.isArray(items)?items:[], at:Date.now(), lang};
+  }catch(e){ if(!newsData[c]) newsData[c]={items:[], at:Date.now(), lang}; }
+  newsBusy[c]=false; if(openCode===c) renderList();
+}
 (async function init(){
   lang = (await sget("lang")) || "zh";
   watchlist = (await sget("watchlist"));
   if(!Array.isArray(watchlist)){ watchlist=[...SEED]; await sset("watchlist",watchlist); }
   quotes = (await sget("quotes")) || {};
+  custom = (await sget("custom")) || {};
   lastUpdated = (await sget("lastUpdated")) || null;
   for(const c of watchlist){
     const n=await sget("note_"+c); if(n) notes[c]=n;
