@@ -1,0 +1,497 @@
+<meta charset="utf-8">
+<!-- Dad's Stocks - bilingual SGX watchlist, large-type, tap-first.
+     Built for an elderly reader who reads but doesn't type.
+     Convention: red = up, green = down. Flip with MOVE_RED_IS_UP below. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root{
+    --ivory:#FBF8F1;
+    --paper:#FFFFFF;
+    --ink:#1C1815;
+    --ink-soft:#6E665C;
+    --line:#EBE4D6;
+    --gold:#A8842C;
+    --jade:#2E6F5E;
+    --gain:#C7402F;   /* red — up, Asian convention */
+    --loss:#2E8B6F;   /* green — down */
+    --press:#F1EADB;
+    --font-base:-apple-system,system-ui,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --font-num:ui-rounded,"SF Pro Display",-apple-system,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--ivory);color:var(--ink);font-family:var(--font-base)}
+  body{max-width:560px;margin:0 auto;padding:0 0 96px;line-height:1.35}
+  .num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-0.01em}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:20;background:linear-gradient(var(--ivory) 78%,rgba(251,248,241,0));
+         padding:18px 20px 12px;border-top:3px solid var(--gold)}
+  .titlerow{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+  .title{font-size:25px;font-weight:700;letter-spacing:-0.01em}
+  .subtitle{font-size:14px;color:var(--ink-soft);margin-top:2px}
+  .lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--paper)}
+  .lang button{appearance:none;border:0;background:transparent;font-family:var(--font-base);
+                font-size:16px;font-weight:600;color:var(--ink-soft);padding:9px 15px;min-height:44px}
+  .lang button.on{background:var(--ink);color:var(--ivory)}
+  .statusrow{display:flex;align-items:center;justify-content:space-between;margin-top:14px;gap:10px}
+  .updated{font-size:13px;color:var(--ink-soft)}
+  .refresh{appearance:none;border:1px solid var(--line);background:var(--paper);color:var(--ink);
+           font-family:var(--font-base);font-size:15px;font-weight:600;padding:10px 16px;border-radius:12px;
+           min-height:46px;display:inline-flex;align-items:center;gap:8px}
+  .refresh:active{background:var(--press)}
+  .refresh.spin .ic{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Cards */
+  main{padding:4px 16px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;margin:12px 0;
+        box-shadow:0 1px 0 rgba(28,24,21,.02);overflow:hidden}
+  .cardhead{display:flex;align-items:center;justify-content:space-between;gap:14px;
+            padding:18px 18px;min-height:84px;cursor:pointer}
+  .cardhead:active{background:var(--press)}
+  .names{min-width:0}
+  .name-main{font-size:22px;font-weight:700;letter-spacing:-0.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .name-sub{font-size:14px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pricewrap{text-align:right;flex:none}
+  .price{font-size:28px;font-weight:700}
+  .ccy{font-size:14px;color:var(--ink-soft);font-weight:600;margin-left:3px}
+  .chip{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:15px;font-weight:700;
+        padding:4px 10px;border-radius:999px;font-family:var(--font-num)}
+  .chip.up{color:var(--gain);background:rgba(199,64,47,.10)}
+  .chip.down{color:var(--loss);background:rgba(46,139,111,.12)}
+  .chip.flat{color:var(--ink-soft);background:var(--press)}
+  .arrow{font-size:13px}
+
+  /* Detail */
+  .detail{border-top:1px solid var(--line);padding:0 18px;max-height:0;overflow:hidden;
+          transition:max-height .28s ease,padding .28s ease}
+  .detail.open{max-height:3000px;padding:16px 18px 18px}
+  .dlabel{font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin:6px 0 6px}
+  .about{font-size:16px;color:var(--ink);line-height:1.55}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .stat{background:var(--ivory);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+  .stat .k{font-size:13px;color:var(--ink-soft)}
+  .stat .v{font-size:18px;font-weight:700;margin-top:3px;font-family:var(--font-num)}
+  .remove{margin-top:16px;width:100%;min-height:50px;border:1px solid var(--line);background:var(--paper);
+          color:var(--gain);font-family:var(--font-base);font-size:16px;font-weight:600;border-radius:12px}
+  .remove:active{background:var(--press)}
+  .muted{color:var(--ink-soft)}
+
+  /* Briefing */
+  .sec{margin-top:15px}
+  .sec p{margin:5px 0 0;font-size:16px;line-height:1.55}
+  .news{list-style:none;margin:5px 0 0;padding:0}
+  .news li{padding:9px 0;border-bottom:1px solid var(--line);font-size:15px;line-height:1.45}
+  .news li:last-child{border-bottom:0}
+  .news .date{color:var(--gold);font-weight:700;font-size:13px;font-family:var(--font-num);margin-right:8px}
+  .prcons{margin-top:5px;display:flex;flex-direction:column;gap:6px}
+  .prcons div{font-size:15px;line-height:1.45}
+  .noteinput{width:100%;min-height:78px;border:1px solid var(--line);border-radius:12px;background:var(--ivory);
+             font-family:var(--font-base);font-size:16px;line-height:1.5;padding:12px 13px;color:var(--ink);resize:vertical;margin-top:6px}
+  .makebtn{width:100%;min-height:52px;margin-top:14px;border:0;border-radius:13px;background:var(--jade);color:#fff;
+           font-family:var(--font-base);font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+  .makebtn:active{filter:brightness(.93)}
+  .sharebox{margin-top:12px;border:1px solid var(--line);border-radius:13px;background:var(--paper);padding:12px}
+  .sharetext{width:100%;min-height:260px;border:0;background:transparent;font-family:var(--font-base);
+             font-size:15px;line-height:1.62;color:var(--ink);resize:vertical}
+  .copybtn{width:100%;min-height:50px;border:0;border-radius:12px;background:var(--ink);color:var(--ivory);
+           font-family:var(--font-base);font-size:16px;font-weight:700;margin-top:8px}
+  .copybtn:active{filter:brightness(1.12)}
+  .notadvice{font-size:12px;color:var(--ink-soft);margin-top:10px;text-align:center}
+
+  /* Empty */
+  .empty{text-align:center;color:var(--ink-soft);font-size:17px;padding:60px 30px;line-height:1.6}
+
+  /* Add button + sheet */
+  .addbar{position:fixed;left:0;right:0;bottom:0;z-index:30;max-width:560px;margin:0 auto;
+          padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+          background:linear-gradient(rgba(251,248,241,0),var(--ivory) 32%)}
+  .addbtn{width:100%;min-height:58px;border:0;border-radius:16px;background:var(--ink);color:var(--ivory);
+          font-family:var(--font-base);font-size:18px;font-weight:700;display:flex;align-items:center;
+          justify-content:center;gap:9px;box-shadow:0 6px 22px rgba(28,24,21,.18)}
+  .addbtn:active{transform:translateY(1px)}
+
+  .sheet-bg{position:fixed;inset:0;z-index:40;background:rgba(28,24,21,.42);opacity:0;pointer-events:none;
+            transition:opacity .25s}
+  .sheet-bg.open{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:560px;margin:0 auto;background:var(--ivory);
+         border-radius:22px 22px 0 0;transform:translateY(102%);transition:transform .3s ease;
+         max-height:86vh;display:flex;flex-direction:column}
+  .sheet.open{transform:translateY(0)}
+  .sheet-head{padding:16px 18px 10px;display:flex;align-items:center;justify-content:space-between}
+  .sheet-title{font-size:20px;font-weight:700}
+  .done{appearance:none;border:0;background:transparent;color:var(--jade);font-family:var(--font-base);
+        font-size:17px;font-weight:700;padding:8px 6px;min-height:44px}
+  .searchwrap{padding:0 18px 10px}
+  .search{width:100%;min-height:52px;border:1px solid var(--line);border-radius:14px;background:var(--paper);
+          font-family:var(--font-base);font-size:17px;padding:0 16px;color:var(--ink)}
+  .search::placeholder{color:var(--ink-soft)}
+  .picklist{overflow-y:auto;padding:4px 12px 24px;-webkit-overflow-scrolling:touch}
+  .pick{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper);
+        border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:8px 0;min-height:66px}
+  .pick .pn{font-size:18px;font-weight:700}
+  .pick .ps{font-size:14px;color:var(--ink-soft);margin-top:2px}
+  .pickadd{flex:none;min-width:62px;min-height:44px;border:1px solid var(--jade);background:var(--paper);
+           color:var(--jade);font-family:var(--font-base);font-size:16px;font-weight:700;border-radius:11px;padding:0 14px}
+  .pickadd:active{background:var(--press)}
+  .pick.in .pickadd{border-color:var(--line);color:var(--ink-soft);background:var(--ivory)}
+
+  .pricenote{text-align:center;font-size:12px;color:var(--ink-soft);padding:2px 0 8px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header>
+  <div class="titlerow">
+    <div>
+      <div class="title" id="t-title"></div>
+      <div class="subtitle" id="t-subtitle"></div>
+    </div>
+    <div class="lang">
+      <button id="lang-zh" onclick="setLang('zh')">中文</button>
+      <button id="lang-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+  <div class="statusrow">
+    <div class="updated" id="t-updated"></div>
+    <button class="refresh" id="refreshBtn" onclick="refreshQuotes()">
+      <span class="ic">↻</span><span id="t-refresh"></span>
+    </button>
+  </div>
+</header>
+
+<main id="list"></main>
+<div class="pricenote" id="t-pricenote"></div>
+
+<div class="addbar">
+  <button class="addbtn" onclick="openSheet()"><span style="font-size:22px;line-height:1">＋</span><span id="t-add"></span></button>
+</div>
+
+<div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-head">
+    <div class="sheet-title" id="t-addtitle"></div>
+    <button class="done" onclick="closeSheet()" id="t-done"></button>
+  </div>
+  <div class="searchwrap">
+    <input class="search" id="search" oninput="renderPicker()" autocomplete="off">
+  </div>
+  <div class="picklist" id="picklist"></div>
+</div>
+
+<script>
+/* ---------- config ---------- */
+const MOVE_RED_IS_UP = true;   // Asian convention. Set false for Western (green=up).
+
+/* ---------- popular SGX counters (tap-to-add library) ---------- */
+const LIBRARY = [
+  {code:"D05", en:"DBS Group", zh:"星展集团"},
+  {code:"O39", en:"OCBC Bank", zh:"华侨银行"},
+  {code:"U11", en:"UOB", zh:"大华银行"},
+  {code:"Z74", en:"Singtel", zh:"新电信"},
+  {code:"S63", en:"ST Engineering", zh:"新科工程"},
+  {code:"BN4", en:"Keppel", zh:"吉宝企业"},
+  {code:"9CI", en:"CapitaLand Investment", zh:"凯德投资"},
+  {code:"U96", en:"Sembcorp Industries", zh:"胜科工业"},
+  {code:"C6L", en:"Singapore Airlines", zh:"新加坡航空"},
+  {code:"G13", en:"Genting Singapore", zh:"云顶新加坡"},
+  {code:"F34", en:"Wilmar International", zh:"丰益国际"},
+  {code:"BS6", en:"Yangzijiang Shipbuilding", zh:"扬子江船业"},
+  {code:"S68", en:"Singapore Exchange (SGX)", zh:"新加坡交易所"},
+  {code:"Y92", en:"Thai Beverage", zh:"泰国酿酒"},
+  {code:"J36", en:"Jardine Matheson", zh:"怡和集团"},
+  {code:"H78", en:"Hongkong Land", zh:"置地控股"},
+  {code:"5E2", en:"Seatrium", zh:"海工科技"},
+  {code:"C09", en:"City Developments (CDL)", zh:"城市发展"},
+  {code:"U14", en:"UOL Group", zh:"大众置地"},
+  {code:"V03", en:"Venture Corporation", zh:"文德工业"},
+  {code:"A17U", en:"CapitaLand Ascendas REIT", zh:"凯德腾飞房产信托"},
+  {code:"C38U", en:"CapitaLand Integrated Commercial Trust", zh:"凯德商用综合信托"},
+  {code:"M44U", en:"Mapletree Logistics Trust", zh:"丰树物流信托"},
+  {code:"N2IU", en:"Mapletree Pan Asia Commercial Trust", zh:"丰树泛亚商业信托"},
+  {code:"ME8U", en:"Mapletree Industrial Trust", zh:"丰树工业信托"},
+  {code:"AJBU", en:"Keppel DC REIT", zh:"吉宝数据中心信托"},
+  {code:"J69U", en:"Frasers Centrepoint Trust", zh:"星狮地产商托"},
+  {code:"T82U", en:"Suntec REIT", zh:"新达信托"},
+];
+
+/* ---------- starter watchlist (edit freely) ---------- */
+const SEED = ["D05","O39","U11","Z74","A17U","N2IU"];
+
+/* ---------- i18n ---------- */
+const T = {
+  en:{title:"Dad's Stocks",subtitle:"Singapore watchlist",refresh:"Refresh",
+      updated:"Updated",updating:"Updating prices…",neverUpdated:"Tap refresh for prices",
+      add:"Add stock",addtitle:"Add a stock",done:"Done",search:"Search name or code",
+      about:"About",stats:"Key figures",mktcap:"Market cap",pe:"P/E",yield:"Dividend yield",
+      range52:"52-week range",remove:"Remove from list",empty:"No stocks yet.\nTap “Add stock” to begin.",
+      loading:"Loading…",dash:"—",pricenote:"Prices are indicative and may be delayed.",inlist:"Added",
+      business:"Business",results:"Latest results",dividend:"Dividend",outlook:"Outlook",news:"Recent news",
+      pros:"In its favour",risks:"Watch-outs",yourtake:"Your note for Dad",
+      notePh:"Add your own view — it goes into the note you send.",
+      makeNote:"Make a note to send",copy:"Copy text",copied:"Copied ✓",
+      notAdvice:"For reference only — not investment advice.",gettingInfo:"Getting the latest…",
+      dataErr:"Couldn't reach the server",
+      fetchNote:"Couldn't reach the data service. If you just deployed, wait a moment and tap Refresh.",
+      noKey:"Briefings need your Anthropic API key. Add ANTHROPIC_API_KEY in your Vercel project settings, then redeploy."},
+  zh:{title:"爸爸的股票",subtitle:"新加坡自选股",refresh:"刷新",
+      updated:"更新于",updating:"正在更新价格…",neverUpdated:"点击刷新获取价格",
+      add:"添加股票",addtitle:"添加股票",done:"完成",search:"搜索名称或代码",
+      about:"公司简介",stats:"主要数据",mktcap:"市值",pe:"市盈率",yield:"股息率",
+      range52:"52周区间",remove:"从列表移除",empty:"还没有股票。\n点击“添加股票”开始。",
+      loading:"加载中…",dash:"—",pricenote:"价格仅供参考，可能有延迟。",inlist:"已添加",
+      business:"业务",results:"最新业绩",dividend:"股息",outlook:"前景展望",news:"最新消息",
+      pros:"优点",risks:"风险",yourtake:"我给爸爸的看法",
+      notePh:"写下你自己的看法 —— 会一起放进要发送的简报里。",
+      makeNote:"生成简报（发给爸爸）",copy:"复制全文",copied:"已复制 ✓",
+      notAdvice:"仅供参考，非投资建议。",gettingInfo:"正在获取最新资料…",
+      dataErr:"无法连接服务器",
+      fetchNote:"无法连接数据服务。如果刚刚部署，请稍等片刻再点刷新。",
+      noKey:"简报功能需要你的 Anthropic API 密钥。请在 Vercel 项目设置中添加 ANTHROPIC_API_KEY，然后重新部署。"},
+};
+
+/* ---------- state ---------- */
+let lang = "zh";
+let watchlist = [];          // [code,...]
+let quotes = {};             // code -> {price,change,changePct,ccy,asOf}
+let briefs = {};             // code -> { zh:{...}, en:{...} }  full briefing per language
+let notes  = {};             // code -> your own note string (included when you make a note to send)
+let lastUpdated = null;
+let openCode = null;
+let dataError = false;       // true when a live fetch fails (e.g. static preview)
+
+/* ---------- storage (localStorage on your deployed site) ---------- */
+async function sget(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return null; } }
+async function sset(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+
+/* ---------- helpers ---------- */
+const meta = c => LIBRARY.find(x=>x.code===c) || {code:c,en:c,zh:c};
+function nameMain(c){ const m=meta(c); return lang==="zh"?m.zh:m.en; }
+function nameSub(c){ const m=meta(c); return (lang==="zh"?m.en:m.zh)+" · "+m.code; }
+function fmt(n,d=2){ return (n==null||isNaN(n))?T[lang].dash:Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function extractJSON(text, arr){
+  if(!text) return null;
+  const o=arr?text.indexOf("["):text.indexOf("{"); const c=arr?text.lastIndexOf("]"):text.lastIndexOf("}");
+  if(o<0||c<0) return null;
+  try{ return JSON.parse(text.slice(o,c+1)); }catch(e){ return null; }
+}
+function joinText(data){ return (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n"); }
+
+/* ---------- backend (your own Vercel functions) ---------- */
+async function apiQuotes(codes){
+  const res = await fetch("/api/quotes?codes="+encodeURIComponent(codes.join(",")));
+  if(!res.ok) throw new Error("quotes "+res.status);
+  return res.json();   // -> [{code,price,change,changePct,ccy}]
+}
+async function apiBrief(code,name,L){
+  const res = await fetch("/api/brief",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({code,name,lang:L})});
+  if(!res.ok) throw new Error("brief "+res.status);
+  return res.json();   // -> {business,...} or {error:true, reason:"no_key"|...}
+}
+
+/* ---------- render ---------- */
+function applyStaticText(){
+  const t=T[lang];
+  document.getElementById("t-title").textContent=t.title;
+  document.getElementById("t-subtitle").textContent=t.subtitle;
+  document.getElementById("t-refresh").textContent=t.refresh;
+  document.getElementById("t-add").textContent=t.add;
+  document.getElementById("t-addtitle").textContent=t.addtitle;
+  document.getElementById("t-done").textContent=t.done;
+  document.getElementById("t-pricenote").textContent=t.pricenote;
+  document.getElementById("search").placeholder=t.search;
+  document.getElementById("lang-zh").classList.toggle("on",lang==="zh");
+  document.getElementById("lang-en").classList.toggle("on",lang==="en");
+  document.documentElement.lang = lang==="zh"?"zh-Hans":"en";
+  updateStatus();
+}
+function updateStatus(){
+  const t=T[lang], el=document.getElementById("t-updated");
+  if(document.getElementById("refreshBtn").classList.contains("spin")){ el.textContent=t.updating; return; }
+  if(dataError){ el.textContent=t.dataErr; return; }
+  if(!lastUpdated){ el.textContent=t.neverUpdated; return; }
+  const d=new Date(lastUpdated);
+  const hh=String(d.getHours()).padStart(2,"0"), mm=String(d.getMinutes()).padStart(2,"0");
+  el.textContent = `${t.updated} ${hh}:${mm}`;
+}
+function chipFor(q){
+  const t=T[lang];
+  if(!q || q.changePct==null) return `<span class="chip flat num">${t.dash}</span>`;
+  const pos = q.changePct>0, neg = q.changePct<0;
+  let cls="flat",arrow="";
+  if(pos){ cls = MOVE_RED_IS_UP?"up":"down"; arrow="▲"; }
+  else if(neg){ cls = MOVE_RED_IS_UP?"down":"up"; arrow="▼"; }
+  const chg = (q.change>0?"+":"")+fmt(q.change);
+  const pct = (q.changePct>0?"+":"")+fmt(q.changePct)+"%";
+  return `<span class="chip ${cls} num"><span class="arrow">${arrow}</span>${chg}　${pct}</span>`;
+}
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+function sec(label, body){ return body?`<div class="sec"><div class="dlabel">${label}</div>${body}</div>`:""; }
+function detailHTML(c){
+  const t=T[lang];
+  const b=(briefs[c]||{})[lang];
+  const removeBtn=`<button class="remove" onclick="event.stopPropagation();removeStock('${c}')">✕ ${t.remove}</button>`;
+  if(!b) return `<div class="about muted">${t.gettingInfo}</div>${removeBtn}`;
+  if(b.error) return `<div class="sec"><p class="muted">${b.reason==="no_key"?t.noKey:t.fetchNote}</p></div>${removeBtn}`;
+  const p=s=>`<p>${esc(s)}</p>`;
+  let h="";
+  h+=sec(t.about,   b.business?p(b.business):"");
+  h+=sec(t.results, b.results ?p(b.results) :"");
+  h+=sec(t.dividend,b.dividend?p(b.dividend):"");
+  h+=sec(t.outlook, b.outlook ?p(b.outlook) :"");
+  h+=`<div class="stats">
+        <div class="stat"><div class="k">${t.mktcap}</div><div class="v">${esc(b.mktcap)||t.dash}</div></div>
+        <div class="stat"><div class="k">${t.pe}</div><div class="v">${esc(b.pe)||t.dash}</div></div>
+        <div class="stat"><div class="k">${t.yield}</div><div class="v">${esc(b.yield)||t.dash}</div></div>
+        <div class="stat"><div class="k">${t.range52}</div><div class="v">${esc(b.range52)||t.dash}</div></div>
+      </div>`;
+  if(Array.isArray(b.news)&&b.news.length){
+    h+=`<div class="sec"><div class="dlabel">${t.news}</div><ul class="news">`+
+       b.news.map(n=>`<li><span class="date">${esc(n.date)}</span>${esc(n.headline)}</li>`).join("")+`</ul></div>`;
+  }
+  const list=(arr,icon)=> (Array.isArray(arr)&&arr.length)?`<div class="prcons">`+arr.map(x=>`<div>${icon} ${esc(x)}</div>`).join("")+`</div>`:"";
+  h+=sec(t.pros, list(b.pros,"✅"));
+  h+=sec(t.risks,list(b.risks,"⚠️"));
+  h+=`<div class="sec"><div class="dlabel">${t.yourtake}</div>
+        <textarea class="noteinput" placeholder="${t.notePh}" onclick="event.stopPropagation()"
+          oninput="saveNote('${c}',this.value)">${esc(notes[c]||"")}</textarea></div>`;
+  h+=`<button class="makebtn" onclick="event.stopPropagation();makeNote('${c}')">✉️ ${t.makeNote}</button>`;
+  h+=`<div id="share-${c}"></div>`;
+  h+=removeBtn;
+  return h;
+}
+function saveNote(c,val){ notes[c]=val; sset("note_"+c,val); }
+function noteText(c){
+  const t=T[lang], m=meta(c), b=(briefs[c]||{})[lang]||{}, q=quotes[c]||{};
+  const L=[];
+  L.push(`${lang==="zh"?m.zh:m.en}（SGX: ${m.code}）`);
+  if(q.price!=null) L.push(`${lang==="zh"?"现价":"Price"}: ${q.ccy||"SGD"} ${fmt(q.price)}`+(q.changePct!=null?`（${q.changePct>0?"+":""}${fmt(q.changePct)}%）`:""));
+  if(b.business) L.push(`【${t.business}】\n${b.business}`);
+  if(b.results)  L.push(`【${t.results}】\n${b.results}`);
+  if(b.dividend) L.push(`【${t.dividend}】\n${b.dividend}`);
+  if(b.outlook)  L.push(`【${t.outlook}】\n${b.outlook}`);
+  if(Array.isArray(b.news)&&b.news.length)  L.push(`【${t.news}】\n`+b.news.map(n=>`• ${n.date?("("+n.date+") "):""}${n.headline}`).join("\n"));
+  if(Array.isArray(b.pros)&&b.pros.length)  L.push(`【${t.pros}】\n`+b.pros.map(x=>`✅ ${x}`).join("\n"));
+  if(Array.isArray(b.risks)&&b.risks.length)L.push(`【${t.risks}】\n`+b.risks.map(x=>`⚠️ ${x}`).join("\n"));
+  if(notes[c]&&notes[c].trim()) L.push(`【${t.yourtake}】\n${notes[c].trim()}`);
+  L.push(`—— ${t.notAdvice}`);
+  return L.join("\n\n");
+}
+function makeNote(c){
+  const t=T[lang], host=document.getElementById("share-"+c); if(!host) return;
+  host.innerHTML=`<div class="sharebox">
+      <textarea class="sharetext" id="st-${c}" onclick="event.stopPropagation()">${esc(noteText(c))}</textarea>
+      <button class="copybtn" onclick="event.stopPropagation();copyNote('${c}',this)">${t.copy}</button>
+    </div>`;
+}
+function copyNote(c,btn){
+  const t=T[lang], ta=document.getElementById("st-"+c); if(!ta) return;
+  const done=()=>{ btn.textContent=t.copied; setTimeout(()=>btn.textContent=t.copy,1600); };
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value).then(done,()=>{ta.focus();ta.select();done();}); }
+    else { ta.focus(); ta.select(); try{document.execCommand("copy");}catch(e){} done(); }
+  }catch(e){ ta.focus(); ta.select(); done(); }
+}
+function renderList(){
+  const t=T[lang], host=document.getElementById("list");
+  if(watchlist.length===0){ host.innerHTML=`<div class="empty">${t.empty.replace("\n","<br>")}</div>`; return; }
+  host.innerHTML = watchlist.map(c=>{
+    const q=quotes[c]||{};
+    const price = q.price!=null?`<span class="num">${fmt(q.price)}</span><span class="ccy">${q.ccy||"SGD"}</span>`
+                              :`<span class="num muted">${t.dash}</span>`;
+    const detail = openCode===c ? detailHTML(c) : "";
+    return `
+      <div class="card">
+        <div class="cardhead" onclick="toggleCard('${c}')">
+          <div class="names">
+            <div class="name-main">${nameMain(c)}</div>
+            <div class="name-sub">${nameSub(c)}</div>
+          </div>
+          <div class="pricewrap">
+            <div class="price">${price}</div>
+            ${chipFor(q)}
+          </div>
+        </div>
+        <div class="detail ${openCode===c?'open':''}">${detail}</div>
+      </div>`;
+  }).join("");
+}
+
+/* ---------- interactions ---------- */
+function setLang(l){ lang=l; sset("lang",l); applyStaticText(); renderList(); renderPicker();
+  if(openCode && !(briefs[openCode]&&briefs[openCode][lang])) loadBrief(openCode,lang); }
+async function toggleCard(c){
+  if(openCode===c){ openCode=null; renderList(); return; }
+  openCode=c; renderList();
+  if(!(briefs[c]&&briefs[c][lang])) loadBrief(c,lang);
+}
+async function removeStock(c){
+  watchlist=watchlist.filter(x=>x!==c);
+  if(openCode===c) openCode=null;
+  await sset("watchlist",watchlist);
+  renderList(); renderPicker();
+}
+async function addStock(c){
+  if(watchlist.includes(c)) return;
+  watchlist.push(c);
+  await sset("watchlist",watchlist);
+  renderList(); renderPicker();
+  if(!quotes[c]) refreshQuotes();
+}
+
+/* ---------- sheet ---------- */
+function openSheet(){ document.getElementById("search").value=""; renderPicker();
+  document.getElementById("sheetBg").classList.add("open"); document.getElementById("sheet").classList.add("open"); }
+function closeSheet(){ document.getElementById("sheetBg").classList.remove("open"); document.getElementById("sheet").classList.remove("open"); }
+function renderPicker(){
+  const t=T[lang], q=(document.getElementById("search").value||"").trim().toLowerCase();
+  const rows = LIBRARY.filter(x=> !q || x.en.toLowerCase().includes(q)||x.zh.includes(q)||x.code.toLowerCase().includes(q));
+  document.getElementById("picklist").innerHTML = rows.map(x=>{
+    const inList = watchlist.includes(x.code);
+    return `<div class="pick ${inList?'in':''}">
+      <div><div class="pn">${lang==="zh"?x.zh:x.en}</div>
+           <div class="ps">${(lang==="zh"?x.en:x.zh)} · ${x.code}</div></div>
+      <button class="pickadd" onclick="addStock('${x.code}')" ${inList?'disabled':''}>${inList?t.inlist:'＋'}</button>
+    </div>`;
+  }).join("") || `<div class="empty">${t.dash}</div>`;
+}
+
+/* ---------- data fetch ---------- */
+async function refreshQuotes(){
+  if(watchlist.length===0) return;
+  const btn=document.getElementById("refreshBtn"); btn.classList.add("spin"); updateStatus();
+  try{
+    const arr = await apiQuotes(watchlist);
+    if(Array.isArray(arr)){
+      arr.forEach(o=>{ if(o&&o.code) quotes[o.code]={price:o.price,change:o.change,changePct:o.changePct,ccy:o.ccy||"SGD"}; });
+      lastUpdated=Date.now(); dataError=false; await sset("quotes",quotes); await sset("lastUpdated",lastUpdated);
+    }
+  }catch(e){ dataError=true; }
+  btn.classList.remove("spin"); updateStatus(); renderList();
+}
+async function loadBrief(c, L){
+  const m=meta(c);
+  try{
+    const obj = await apiBrief(m.code, m.en, L);
+    if(!briefs[c]) briefs[c]={};
+    if(obj && !obj.error){ briefs[c][L]=obj; await sset("brief_"+c+"_"+L, obj); }
+    else { briefs[c][L]={error:true, reason:(obj&&obj.reason)||null}; }
+  }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
+  if(openCode===c && lang===L) renderList();
+}
+
+/* ---------- boot ---------- */
+(async function init(){
+  lang = (await sget("lang")) || "zh";
+  watchlist = (await sget("watchlist"));
+  if(!Array.isArray(watchlist)){ watchlist=[...SEED]; await sset("watchlist",watchlist); }
+  quotes = (await sget("quotes")) || {};
+  lastUpdated = (await sget("lastUpdated")) || null;
+  for(const c of watchlist){
+    const n=await sget("note_"+c); if(n) notes[c]=n;
+    for(const L of ["zh","en"]){ const b=await sget("brief_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=b; } }
+  }
+  applyStaticText(); renderList(); renderPicker();
+  refreshQuotes();   // pull fresh prices on open
+})();
+</script>
