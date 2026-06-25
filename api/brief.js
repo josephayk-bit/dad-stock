@@ -34,7 +34,10 @@ Return ONLY a JSON object, no markdown, with keys:
 "analyst" (a brief factual summary of recent analyst/broker ratings or target prices that have been publicly reported, e.g. "Several brokers rate it Buy, average target ~S$X"; report what analysts say, do NOT give your own recommendation; null if none found),
 "insider" (any recent director or substantial-shareholder buying or selling that has been publicly disclosed, 1 sentence; null if none),
 "navps" (net asset value / book value per share, short string like "S$1.85"; null if unknown),
-"pb" (price-to-book ratio, e.g. "0.8"; null),
+"pb" (price-to-book ratio as a number-like string, e.g. "0.8"; null),
+"totalassets" (total assets on the balance sheet, short e.g. "S$2.1B"; null),
+"netassets" (net assets / shareholders' equity / total book value, short e.g. "S$1.4B"; null),
+"shares" (shares outstanding, short e.g. "1.21B"; null),
 "netcash" (net cash or net debt position in one short phrase, e.g. "Net cash S$45m" or "Net debt S$120m"; null),
 "pros" (array of 2-4 short factual positives),
 "risks" (array of 2-4 short factual risks),
@@ -51,7 +54,7 @@ Stay factual. Do NOT give buy, sell, or hold recommendations of your own.`;
       },
       body: JSON.stringify({
         model,
-        max_tokens: 1900,
+        max_tokens: 2000,
         messages: [{ role: "user", content: prompt }],
         tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }]
       })

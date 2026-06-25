@@ -14,9 +14,20 @@ dad-stocks-app/
 │   ├── brief.js       writes the company briefings (uses YOUR Anthropic key)
 │   ├── find.js        searches the whole SGX universe by name/code/voice (uses your key)
 │   ├── photo.js       reads stock names from a photo / CDP statement (uses your key)
-│   └── news.js        pulls the latest dated news per counter, with source links (uses your key)
+│   ├── news.js        pulls the latest dated news per counter, with source links (uses your key)
+│   └── watchlist.js   the shared list, so you and your dad see the same stocks (uses a Vercel database)
 └── README.md          this guide
 ```
+
+## Shared watchlist (so you both see the same list)
+
+By default each device keeps its own list. To make your additions appear on your dad's iPad, add a free Redis database:
+
+1. In Vercel, top nav → **Storage** → **Create Database** → choose **Redis** (Upstash) from the Marketplace → pick the **free** plan → create.
+2. **Connect** it to your **dad-stock** project (Storage → the database → Projects/Settings → Connect). This auto-adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` to the project.
+3. **Redeploy** (Deployments → latest → ⋯ → Redeploy).
+
+Now the list lives on the server. Add a counter on your phone, and it shows up on your dad's iPad when he opens the app or taps **Refresh**. Until you add the database, the app still works — each device just keeps its own list.
 
 Three ways to add a counter: type it, tap **🎤** and say the name (English or Chinese), or tap **📷 Add by photo** to snap a CDP statement / handwritten list and add the holdings it finds (with an "Add all"). On your dad's home-screen app, the most reliable mic is the **iPad keyboard's own 🎤** (tap the box first, then the keyboard mic).
 
