@@ -31,13 +31,21 @@ module.exports = async function handler(req, res) {
     return null;
   }
 
-  async function fetchSgxJson() {
-    const params = "nc,cn,n,lt,l,c,change_vs_pc,change_vs_pc_percentage,pv,p,o,h,lo,v,vl,vwap,trading_time,type,trading_currency,cur";
-    const url = "https://api.sgx.com/securities/v1.1?excludetypes=bonds&params=" + encodeURIComponent(params);
+  async function fetchSgxOnce(paramStr) {
+    const url = "https://api.sgx.com/securities/v1.1?excludetypes=bonds" + (paramStr ? "&params=" + encodeURIComponent(paramStr) : "");
     const r = await fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json", "Referer": "https://www.sgx.com/" } });
     const txt = await r.text();
     let j = null; try { j = JSON.parse(txt); } catch (e) {}
     return { status: r.status, txt, j };
+  }
+  async function fetchSgxJson() {
+    // canonical field list used by the SGX website itself
+    const canonical = "nc,adjusted-vwap,b,bv,p,c,change_vs_pc,change_vs_pc_percentage,cx,cn,dp,dpc,du,ed,generic,iv,iv_protection,l,lt,ll,ltt,ltq,lo,o,pv,pts,s,sv,trading_time,v,vl,vwap,vwap-currency";
+    let resp = await fetchSgxOnce(canonical);
+    if (findRecords(resp.j, 0)) return resp;
+    let resp2 = await fetchSgxOnce("nc,cn,lt,l,c,change_vs_pc,change_vs_pc_percentage,p,pv");
+    if (findRecords(resp2.j, 0)) return resp2;
+    return resp;
   }
 
   async function getSgxList() {
