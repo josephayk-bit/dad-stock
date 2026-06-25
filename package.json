@@ -1,0 +1,8 @@
+{
+  "name": "dad-stock",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "ioredis": "^5.4.2"
+  }
+}
