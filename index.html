@@ -182,6 +182,9 @@
   .ftable th:first-child,.ftable td:first-child{text-align:left;position:sticky;left:0;background:var(--paper);font-weight:700}
   .ftable tbody tr:last-child td{border-bottom:0}
   .ftable td.navcol{color:var(--gold);font-weight:800;background:rgba(168,132,44,.07)}
+  .ftable td.navedit{cursor:pointer}
+  .navadd{display:inline-block;min-width:22px;text-align:center;color:var(--gold);opacity:.55;font-weight:800}
+  .ftable td.navedit:active{background:rgba(168,132,44,.16)}
   .ftable th.navcol{color:var(--gold);background:rgba(168,132,44,.07)}
   .picklist{overflow-y:auto;padding:4px 12px 24px;-webkit-overflow-scrolling:touch}
   .pick{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper);
@@ -298,6 +301,7 @@ const T = {
       assetval:"Asset value vs price",totalassets:"Total assets",netassets:"Net assets (book)",shares:"Shares out",
       totalliab:"Total liabilities",calc:"calculated",
       divschedule:"Dividend schedule (past year)",dtype:"Type",dex:"Ex-date",dpay:"Pay date",dper:"Per share",
+      tapnav:"Tap a NAV/share cell to type it from the book",enterNav:"NAV/share for {y} (from the book):",
       financials:"Year-by-year",fyear:"FY",frev:"Revenue",fprofit:"Net profit",fnav:"NAV/share",fdiv:"Dividend",froe:"ROE",
       pbtimes:"× book value",belowBook:"trading BELOW net asset value",aroundBook:"around net asset value",aboveBook:"above net asset value",
       insider:"Insider / shareholder moves",keydates:"Key dates",
@@ -325,6 +329,7 @@ const T = {
       assetval:"资产估值 vs 股价",totalassets:"总资产",netassets:"净资产(账面)",shares:"股本/股数",
       totalliab:"总负债",calc:"计算值",
       divschedule:"派息时间表（过去一年）",dtype:"类型",dex:"除权日",dpay:"派发日",dper:"每股",
+      tapnav:"轻按“每股净资产”格子可输入账面值",enterNav:"{y} 每股净资产（账面值）：",
       financials:"历年财务",fyear:"财年",frev:"营业额",fprofit:"净利",fnav:"每股净资产",fdiv:"派息",froe:"股本回报",
       pbtimes:"倍账面",belowBook:"低于每股净资产",aroundBook:"接近每股净资产",aboveBook:"高于每股净资产",
       insider:"内部人 / 大股东动向",keydates:"重要日期",
@@ -348,6 +353,7 @@ let lastUpdated = null;
 let openCode = null;
 let dataError = false;       // true when a live fetch fails (e.g. static preview)
 let custom = {};             // code -> {en,zh} for stocks added via search (not in LIBRARY)
+let manual = {};             // code -> { "FY2024": "S$0.42", ... }  NAV/share typed from the book
 let findResults = [];        // remote search / photo candidates
 let findBusy = false, findTimer = null, lastQuery = "";
 let photoBusy = false, pickMsg = "";
@@ -414,14 +420,25 @@ async function apiGetList(){
 }
 async function apiSaveList(){
   try{ await fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({watchlist,custom})}); }catch(e){}
+    body:JSON.stringify({watchlist,custom,manual})}); }catch(e){}
 }
-async function persistList(){ await sset("watchlist",watchlist); await sset("custom",custom); apiSaveList(); }
+async function editNav(code, year){
+  const cur=(manual[code]&&manual[code][year])||"";
+  const val=prompt(T[lang].enterNav.replace("{y}",year), cur);
+  if(val===null) return;
+  const v=val.trim();
+  if(!manual[code]) manual[code]={};
+  if(v) manual[code][year]=v; else delete manual[code][year];
+  if(manual[code] && Object.keys(manual[code]).length===0) delete manual[code];
+  await persistList();
+  renderList();
+}
+async function persistList(){ await sset("watchlist",watchlist); await sset("custom",custom); await sset("manual",manual); apiSaveList(); }
 async function syncList(){
   const remote=await apiGetList();
   if(remote && Array.isArray(remote.watchlist)){
-    watchlist=remote.watchlist; custom=remote.custom||custom;
-    await sset("watchlist",watchlist); await sset("custom",custom);
+    watchlist=remote.watchlist; custom=remote.custom||custom; manual=remote.manual||manual;
+    await sset("watchlist",watchlist); await sset("custom",custom); await sset("manual",manual);
     renderList();
   }
 }
@@ -506,6 +523,8 @@ function detailHTML(c){
   if(Array.isArray(b.financials)&&b.financials.length){
     const F=b.financials;
     const navFor=(r)=>{
+      const mo=(manual[c]&&manual[c][r.year]);
+      if(mo) return {v:esc(mo),calc:false,man:true};
       if(r.navps) return {v:esc(r.navps),calc:false};
       const eq=parseAmt(r.netassets), sh=parseAmt(r.shares)||sharesCount;
       if(eq&&sh&&sh>0){ const per=eq/sh; if(per>0.001&&per<100000) return {v:curSym()+per.toFixed(2),calc:true}; }
@@ -522,15 +541,16 @@ function detailHTML(c){
       const nv=navFor(r), re=roeFor(r);
       if(nv.calc||re.calc) anyCalc=true;
       const star=`<sup class="calcstar">*</sup>`;
+      const navInner = (nv.v===t.dash ? `<span class="navadd">＋</span>` : nv.v) + (nv.calc?star:"") + (nv.man?`<sup class="calcstar">✎</sup>`:"");
       return `<tr><td>${esc(r.year)}</td><td>${esc(r.revenue)||t.dash}</td><td>${esc(r.profit)||t.dash}</td>`+
-        `<td class="navcol">${nv.v}${nv.calc?star:""}</td><td>${esc(r.dividend)||t.dash}</td>`+
+        `<td class="navcol navedit" onclick="editNav('${c}','${esc(r.year)}')">${navInner}</td><td>${esc(r.dividend)||t.dash}</td>`+
         `<td>${re.v}${re.calc?star:""}</td></tr>`;
     }).join("");
     h+=`<div class="sec"><div class="dlabel">${t.financials}</div>
       <div class="ftwrap"><table class="ftable">
         <thead><tr><th>${t.fyear}</th><th>${t.frev}</th><th>${t.fprofit}</th><th class="navcol">${t.fnav}</th><th>${t.fdiv}</th><th>${t.froe}</th></tr></thead>
         <tbody>`+rows+`</tbody></table></div>`+
-      (anyCalc?`<div class="ftnote">* ${t.calc}</div>`:"")+`</div>`;
+      `<div class="ftnote">${anyCalc?("* "+t.calc+" · "):""}${t.tapnav}</div>`+`</div>`;
   }
   if(Array.isArray(b.people)&&b.people.length){
     h+=`<div class="sec"><div class="dlabel">${t.people}</div><div class="people">`+
@@ -792,10 +812,11 @@ async function loadNews(c, force){
 (async function init(){
   lang = (await sget("lang")) || "zh";
   custom = (await sget("custom")) || {};
+  manual = (await sget("manual")) || {};
   const remote = await apiGetList();                       // shared list (null if store not set up)
   if(remote && Array.isArray(remote.watchlist) && remote.watchlist.length){
-    watchlist = remote.watchlist; custom = remote.custom || custom;
-    await sset("watchlist",watchlist); await sset("custom",custom);
+    watchlist = remote.watchlist; custom = remote.custom || custom; manual = remote.manual || manual;
+    await sset("watchlist",watchlist); await sset("custom",custom); await sset("manual",manual);
   } else {
     watchlist = (await sget("watchlist"));
     if(!Array.isArray(watchlist) || !watchlist.length){ watchlist=[...SEED]; }

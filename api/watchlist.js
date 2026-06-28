@@ -43,7 +43,8 @@ module.exports = async function handler(req, res) {
       if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
       const data = {
         watchlist: Array.isArray(body && body.watchlist) ? body.watchlist : [],
-        custom: (body && body.custom) || {}
+        custom: (body && body.custom) || {},
+        manual: (body && body.manual) || {}
       };
       const val = JSON.stringify(data);
       if (useRest) await restCmd(["SET", KEY, val]); else await client.set(KEY, val);
@@ -55,12 +56,13 @@ module.exports = async function handler(req, res) {
     if (useRest) { const o = await restCmd(["GET", KEY]); raw = o && o.result; }
     else { raw = await client.get(KEY); }
 
-    let data = { watchlist: [], custom: {} };
+    let data = { watchlist: [], custom: {}, manual: {} };
     if (raw) { try { data = JSON.parse(raw); } catch (e) {} }
     res.status(200).json({
       configured: true,
       watchlist: Array.isArray(data.watchlist) ? data.watchlist : [],
-      custom: data.custom || {}
+      custom: data.custom || {},
+      manual: data.manual || {}
     });
   } catch (e) {
     res.status(200).json({ configured: false, error: String(e).slice(0, 200) });
