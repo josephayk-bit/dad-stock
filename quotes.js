@@ -1,7 +1,6 @@
 // POST /api/quotes  body { codes:[...], names:{...} }   (also GET ?codes=D05,O39)
-// Primary source: SGX's own public securities feed (no key, server-friendly).
-// Fallback: Yahoo Finance. Returns [{code,price,change,changePct,ccy}].
-// Debug: GET /api/quotes?debug=1  -> shows one raw SGX record so field names can be verified.
+// Primary source: SGX's own public securities feed. Fallback: Yahoo Finance.
+// Debug: GET /api/quotes?debug=1  -> shows SGX response shape + a sample record.
 
 let SGX_CACHE = { at: 0, list: null };
 
@@ -15,20 +14,50 @@ module.exports = async function handler(req, res) {
   const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
-  // ---- SGX full-list (cached ~60s in warm instances) ----
+  // Recursively locate the array of security records (objects that have a code field)
+  function findRecords(obj, depth) {
+    if (depth > 6 || obj == null) return null;
+    if (Array.isArray(obj)) {
+      if (obj.length && obj[0] && typeof obj[0] === "object" &&
+          ("nc" in obj[0] || "n" in obj[0] || "code" in obj[0])) return obj;
+      return null;
+    }
+    if (typeof obj === "object") {
+      for (const k of Object.keys(obj)) {
+        const f = findRecords(obj[k], depth + 1);
+        if (f && f.length) return f;
+      }
+    }
+    return null;
+  }
+
+  async function fetchSgxOnce(paramStr) {
+    const url = "https://api.sgx.com/securities/v1.1?excludetypes=bonds" + (paramStr ? "&params=" + encodeURIComponent(paramStr) : "");
+    const r = await fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json", "Referer": "https://www.sgx.com/" } });
+    const txt = await r.text();
+    let j = null; try { j = JSON.parse(txt); } catch (e) {}
+    return { status: r.status, txt, j };
+  }
+  async function fetchSgxJson() {
+    // canonical field list used by the SGX website itself
+    const canonical = "nc,adjusted-vwap,b,bv,p,c,change_vs_pc,change_vs_pc_percentage,cx,cn,dp,dpc,du,ed,generic,iv,iv_protection,l,lt,ll,ltt,ltq,lo,o,pv,pts,s,sv,trading_time,v,vl,vwap,vwap-currency";
+    let resp = await fetchSgxOnce(canonical);
+    if (findRecords(resp.j, 0)) return resp;
+    let resp2 = await fetchSgxOnce("nc,cn,lt,l,c,change_vs_pc,change_vs_pc_percentage,p,pv");
+    if (findRecords(resp2.j, 0)) return resp2;
+    return resp;
+  }
+
   async function getSgxList() {
     if (SGX_CACHE.list && Date.now() - SGX_CACHE.at < 60000) return SGX_CACHE.list;
-    const params = "nc,cn,lt,l,c,change_vs_pc,change_vs_pc_percentage,pv,p,o,h,lo,v,vl,vwap,trading_time,type,trading_currency,cur";
-    const url = "https://api.sgx.com/securities/v1.1?excludetypes=bonds&params=" + encodeURIComponent(params);
-    const r = await fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json", "Referer": "https://www.sgx.com/" } });
-    if (!r.ok) throw new Error("sgx " + r.status);
-    const j = await r.json();
-    const list = Array.isArray(j) ? j : (j.data || j.securities || j.prices || []);
+    const { j } = await fetchSgxJson();
+    const list = findRecords(j, 0) || [];
     SGX_CACHE = { at: Date.now(), list };
     return list;
   }
+
   function sgxQuote(list, code) {
-    const it = list.find((x) => x && String(x.nc || "").toUpperCase() === code.toUpperCase());
+    const it = list.find((x) => x && String(x.nc || x.code || "").toUpperCase() === code.toUpperCase());
     if (!it) return null;
     const price = num(it.lt != null ? it.lt : (it.l != null ? it.l : (it.p != null ? it.p : it.last)));
     if (price == null) return null;
@@ -41,7 +70,6 @@ module.exports = async function handler(req, res) {
     };
   }
 
-  // ---- Yahoo fallback ----
   async function fetchMeta(sym) {
     for (const host of ["query1", "query2"]) {
       try {
@@ -59,9 +87,16 @@ module.exports = async function handler(req, res) {
   // ---- debug ----
   if (req.query && req.query.debug) {
     try {
-      const list = await getSgxList();
-      const sample = list.slice(0, 3);
-      res.status(200).json({ ok: true, count: list.length, sample });
+      const { status, txt, j } = await fetchSgxJson();
+      const recs = findRecords(j, 0);
+      res.status(200).json({
+        ok: true,
+        httpStatus: status,
+        topKeys: (j && typeof j === "object") ? Object.keys(j) : null,
+        foundRecords: recs ? recs.length : 0,
+        sample: recs ? recs.slice(0, 2) : null,
+        rawHead: recs ? null : txt.slice(0, 1200)
+      });
     } catch (e) {
       res.status(200).json({ ok: false, error: String(e) });
     }
@@ -81,13 +116,12 @@ module.exports = async function handler(req, res) {
   codes = codes.map((s) => String(s).trim()).filter(Boolean);
   if (!codes.length) { res.status(400).json({ error: "no codes" }); return; }
 
-  // get SGX list once
   let list = null;
   try { list = await getSgxList(); } catch (e) { list = null; }
 
   async function one(code) {
-    if (list) { const q = sgxQuote(list, code); if (q) return q; }       // SGX first
-    try {                                                                // Yahoo fallback
+    if (list && list.length) { try { const q = sgxQuote(list, code); if (q) return q; } catch (e) {} }
+    try {
       const sym = /\./.test(code) ? code : code + ".SI";
       const m = await fetchMeta(sym);
       if (m) {
