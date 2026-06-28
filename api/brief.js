@@ -7,7 +7,7 @@
 // usually costs NO API credits and loads instantly. The cache auto-refreshes after
 // 30 days, when BRIEF_VERSION is bumped (new app version), or with ?fresh=1.
 
-const BRIEF_VERSION = "v10";              // bump to force every briefing to refresh
+const BRIEF_VERSION = "v11";              // bump to force every briefing to refresh
 const BRIEF_TTL = 60 * 60 * 24 * 30;     // 30 days, in seconds
 
 let _redis = undefined; // undefined = not tried, null = unavailable, object = client
@@ -57,10 +57,10 @@ Return ONLY a JSON object, no markdown, with keys:
 "business" (1-3 sentences: what it does / main business segments),
 "people" (array of up to 4 {"role":"Chairman / CEO / Major shareholder / etc","name":"name, with stake % if a shareholder"}; the key appointment holders AND the controlling or substantial shareholders — important for a small-cap investor),
 "results" (latest reported revenue and net profit with year-on-year change, 1-2 sentences),
-"financials" (array of up to 5 fiscal years, newest first. For EACH year provide these fields: "year" (e.g. "FY2025"); "revenue"; "profit" (net profit); "navps" (NAV / book value per share for that year — if the company reports it, use that; if not, CALCULATE it yourself as that year's net assets divided by shares outstanding and give the result; only use null if you genuinely cannot find OR calculate it); "netassets" (that year's total shareholders' equity / net assets, e.g. "S$120m" — REQUIRED: provide this for EVERY year, it is the key figure the app uses to compute NAV/share); "dividend" (total dividend per share declared that year, e.g. "S$0.08"); "roe" (return on equity as a percent like "12%", reported or net profit / equity). NAV/share is the single most important column — do your best to fill it for EVERY year. NEVER guess or fabricate figures — an honest blank is better than a wrong number),
+"financials" (array of up to 5 fiscal years, newest first. CRITICAL: fill "navps" (NAV / book value per share) for EVERY year — it is the single most important number to the reader. If a year's NAV/share is not directly reported, CALCULATE it as that year's net assets divided by shares outstanding. Each item must have: {"year","revenue","profit" (net profit),"navps" (NAV per share),"netassets" (that year's total shareholders' equity),"dividend" (per share),"roe" (percent)}. A well-filled example row: {"year":"FY2024","revenue":"S$20.2B","profit":"S$10.3B","navps":"S$20.80","netassets":"S$59B","dividend":"S$1.92","roe":"17%"}. Always include netassets too so the app can verify. NEVER fabricate — if one specific field truly isn't available leave just that field null, but make every effort to fill navps for every year),
 "dividend" (latest dividend per share and approximate yield in 1 sentence; null if none),
 "divtrack" (one short phrase on dividend track record if notable, e.g. "Paid dividends 12 years running"; null),
-"divschedule" (array of the company's ACTUAL dividend payments over roughly the last 12-18 months, newest first, each {"label":"Final / Interim / Q1 / Special / etc","exdate":"YYYY-MM-DD (ex-dividend date)","paydate":"YYYY-MM-DD (payment date)","amount":"S$0.54 (per share)"}; include only real, publicly announced dividends with dates from the announcements — never invent dates or amounts; empty array if the company does not pay dividends or none are found),
+"divschedule" (array listing EVERY dividend the company paid over the last 12 months, newest first — do NOT return only the most recent one. A quarterly payer will have about 4 entries, a half-yearly payer about 2, plus any special/capital-return dividend. Each: {"label":"Q1 / Interim / Final / Special / etc","exdate":"YYYY-MM-DD (ex-dividend date)","paydate":"YYYY-MM-DD (payment date)","amount":"S$0.54 (per share)"}. Use only real, publicly announced dates and amounts — never invent them; empty array if the company does not pay dividends),
 "keydates" (next ex-dividend date and/or AGM date if known; short; null),
 "outlook" (management guidance or sector outlook, 1-2 sentences),
 "analyst" (a brief factual summary of recent analyst/broker ratings or target prices that have been publicly reported, e.g. "Several brokers rate it Buy, average target ~S$X"; report what analysts say, do NOT give your own recommendation; null if none found),
@@ -88,9 +88,9 @@ Stay factual. Do NOT give buy, sell, or hold recommendations of your own.`;
       },
       body: JSON.stringify({
         model,
-        max_tokens: 3200,
+        max_tokens: 3500,
         messages: [{ role: "user", content: prompt }],
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }]
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }]
       })
     });
 
