@@ -26,7 +26,7 @@ Return ONLY a JSON object, no markdown, with keys:
 "business" (1-3 sentences: what it does / main business segments),
 "people" (array of up to 4 {"role":"Chairman / CEO / Major shareholder / etc","name":"name, with stake % if a shareholder"}; the key appointment holders AND the controlling or substantial shareholders — important for a small-cap investor),
 "results" (latest reported revenue and net profit with year-on-year change, 1-2 sentences),
-"financials" (array of up to 5 fiscal years, newest first, each {"year":"FY2025","revenue":"S$13.9B","profit":"S$7.3B","navps":"S$1.85","dividend":"S$0.99","roe":"12%"}; use null for any unknown field — NAV/share (navps) per year is the most important so include it whenever possible),
+"financials" (array of up to 5 fiscal years, newest first. For EACH year provide these fields: "year" (e.g. "FY2025"); "revenue"; "profit" (net profit); "navps" (NAV / book value per share for THAT year — if not directly reported, CALCULATE it as that year's net assets (shareholders' equity) divided by shares outstanding); "dividend" (total dividend per share declared for that year, e.g. "S$0.08"); "roe" (return on equity = net profit / shareholders' equity, as a percent like "12%"). NAV/share is the MOST IMPORTANT column to your reader — fill it for every year you can, calculating it when it is not directly reported. Use null for a field ONLY when you genuinely cannot determine or reasonably calculate it from public filings. NEVER guess or fabricate financial figures — an honest blank is better than a wrong number),
 "dividend" (latest dividend per share and approximate yield in 1 sentence; null if none),
 "divtrack" (one short phrase on dividend track record if notable, e.g. "Paid dividends 12 years running"; null),
 "keydates" (next ex-dividend date and/or AGM date if known; short; null),
@@ -56,7 +56,7 @@ Stay factual. Do NOT give buy, sell, or hold recommendations of your own.`;
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2200,
+        max_tokens: 2600,
         messages: [{ role: "user", content: prompt }],
         tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }]
       })
