@@ -1,6 +1,22 @@
 // POST /api/news   body: { code, name, lang }
-// Live web search for the LATEST news on a counter — dated, with source and link,
-// so it can be verified. Uses YOUR Anthropic key (hidden here). Not cached server-side.
+// Live web search for the LATEST news on a counter — dated, with source and link.
+// Uses YOUR Anthropic key (hidden here). Cached in the shared database for 6 hours
+// so it loads fast and is shared across devices, while staying fresh. ?fresh=1 bypasses.
+
+const NEWS_TTL = 60 * 60 * 6; // 6 hours, in seconds
+
+let _redis = undefined;
+function getRedis() {
+  if (_redis !== undefined) return _redis;
+  const url = process.env.REDIS_URL || process.env.KV_URL || process.env.REDIS_URI;
+  if (!url) { _redis = null; return null; }
+  try {
+    const Redis = require("ioredis");
+    const c = new Redis(url, { maxRetriesPerRequest: 2, enableReadyCheck: false, connectTimeout: 4000 });
+    c.on("error", () => {});
+    _redis = c; return c;
+  } catch (e) { _redis = null; return null; }
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "POST only" }); return; }
@@ -12,7 +28,15 @@ module.exports = async function handler(req, res) {
   if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   const code = (body && body.code) || "";
   const name = (body && body.name) || code;
-  const langName = (body && body.lang) === "zh" ? "Simplified Chinese" : "English";
+  const lang = (body && body.lang) === "zh" ? "zh" : "en";
+  const langName = lang === "zh" ? "Simplified Chinese" : "English";
+  const fresh = (req.query && req.query.fresh) || (body && body.fresh);
+
+  const redis = getRedis();
+  const cacheKey = "dadstocks:news:" + code + ":" + lang;
+  if (redis && !fresh) {
+    try { const hit = await redis.get(cacheKey); if (hit) { res.status(200).json(JSON.parse(hit)); return; } } catch (e) {}
+  }
 
   const model = process.env.BRIEF_MODEL || "claude-haiku-4-5-20251001";
 
@@ -61,6 +85,7 @@ Only include genuine, recently published items, and only include a url if it cam
         url: (typeof x.url === "string" && /^https?:\/\//i.test(x.url)) ? x.url : null
       }));
 
+    if (redis) { try { await redis.set(cacheKey, JSON.stringify(out), "EX", NEWS_TTL); } catch (e) {} }
     res.status(200).json(out);
   } catch (e) {
     res.status(200).json([]);

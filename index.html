@@ -297,6 +297,7 @@ const T = {
       people:"Key people & owners",pb:"P/B",navps:"NAV/share",netcash:"Cash position",
       assetval:"Asset value vs price",totalassets:"Total assets",netassets:"Net assets (book)",shares:"Shares out",
       totalliab:"Total liabilities",calc:"calculated",
+      divschedule:"Dividend schedule (past year)",dtype:"Type",dex:"Ex-date",dpay:"Pay date",dper:"Per share",
       financials:"Year-by-year",fyear:"FY",frev:"Revenue",fprofit:"Net profit",fnav:"NAV/share",fdiv:"Dividend",froe:"ROE",
       pbtimes:"× book value",belowBook:"trading BELOW net asset value",aroundBook:"around net asset value",aboveBook:"above net asset value",
       insider:"Insider / shareholder moves",keydates:"Key dates",
@@ -323,6 +324,7 @@ const T = {
       people:"主要人物与大股东",pb:"市净率",navps:"每股净资产",netcash:"现金状况",
       assetval:"资产估值 vs 股价",totalassets:"总资产",netassets:"净资产(账面)",shares:"股本/股数",
       totalliab:"总负债",calc:"计算值",
+      divschedule:"派息时间表（过去一年）",dtype:"类型",dex:"除权日",dpay:"派发日",dper:"每股",
       financials:"历年财务",fyear:"财年",frev:"营业额",fprofit:"净利",fnav:"每股净资产",fdiv:"派息",froe:"股本回报",
       pbtimes:"倍账面",belowBook:"低于每股净资产",aroundBook:"接近每股净资产",aboveBook:"高于每股净资产",
       insider:"内部人 / 大股东动向",keydates:"重要日期",
@@ -483,21 +485,30 @@ function detailHTML(c){
   if(!b) return `<div class="about muted">${t.gettingInfo}</div>${removeBtn}`;
   if(b.error) return `<div class="sec"><p class="muted">${b.reason==="no_key"?t.noKey:t.fetchNote}</p></div>${removeBtn}`;
   const p=s=>`<p>${esc(s)}</p>`;
+  // --- shared helpers for NAV maths (used by both the table and the asset-value box) ---
+  const parseAmt=(s)=>{ if(s==null) return null; let str=String(s);
+    let mult=1;
+    if(/亿/.test(str)) mult=1e8; else if(/万/.test(str)) mult=1e4;
+    else if(/b/i.test(str)) mult=1e9; else if(/m/i.test(str)) mult=1e6; else if(/k/i.test(str)) mult=1e3;
+    const n=parseFloat(str.replace(/[^0-9.\-]/g,"")); return isNaN(n)?null:n*mult; };
+  const curSym=()=> (lang==="zh"?"新币":"S$");
+  const curPrice=(quotes[c]&&quotes[c].price)?quotes[c].price:null;
+  // derive a reliable share count without relying on the AI's "shares" field
+  let sharesCount=parseAmt(b.shares);
+  if(!sharesCount && b.netassets && b.navps){ const e=parseAmt(b.netassets), n=parseAmt(b.navps); if(e&&n&&n>0) sharesCount=e/n; }
+  if(!sharesCount && b.mktcap && curPrice){ const mc=parseAmt(b.mktcap); if(mc&&curPrice>0) sharesCount=mc/curPrice; }
+  // current NAV/share (use reported; else calculate from net assets ÷ shares)
+  let curNav=b.navps, curNavCalc=!!b.navpscalc;
+  if(!curNav && b.netassets && sharesCount){ const e=parseAmt(b.netassets); if(e){ curNav=curSym()+(e/sharesCount).toFixed(2); curNavCalc=true; } }
   let h="";
   h+=sec(t.about,   b.business?p(b.business):"");
   h+=sec(t.results, b.results ?p(b.results) :"");
   if(Array.isArray(b.financials)&&b.financials.length){
     const F=b.financials;
-    const parseAmt=(s)=>{ if(s==null) return null; let str=String(s);
-      let mult=1;
-      if(/亿/.test(str)) mult=1e8; else if(/万/.test(str)) mult=1e4;
-      else if(/b/i.test(str)) mult=1e9; else if(/m/i.test(str)) mult=1e6; else if(/k/i.test(str)) mult=1e3;
-      const n=parseFloat(str.replace(/[^0-9.\-]/g,"")); return isNaN(n)?null:n*mult; };
-    const cur=()=> (lang==="zh"?"新币":"S$");
     const navFor=(r)=>{
       if(r.navps) return {v:esc(r.navps),calc:false};
-      const eq=parseAmt(r.netassets), sh=parseAmt(r.shares)||parseAmt(b.shares);
-      if(eq&&sh&&sh>0){ const per=eq/sh; if(per>0.001&&per<100000) return {v:cur()+per.toFixed(2),calc:true}; }
+      const eq=parseAmt(r.netassets), sh=parseAmt(r.shares)||sharesCount;
+      if(eq&&sh&&sh>0){ const per=eq/sh; if(per>0.001&&per<100000) return {v:curSym()+per.toFixed(2),calc:true}; }
       return {v:t.dash,calc:false};
     };
     const roeFor=(r)=>{
@@ -535,16 +546,25 @@ function detailHTML(c){
     verdict = `<div class="pbline ${cls}"><span class="pbnum">${pbNum.toFixed(2)} ${t.pbtimes}</span><span class="pbword">${word}</span></div>`;
   }
   const rowval=(label,val)=>{
-    if(label===t.navps && b.navpscalc && val) return esc(val)+` <span class="calcnote">${t.calc}</span>`;
+    if(label===t.navps && curNavCalc && val) return esc(val)+` <span class="calcnote">${t.calc}</span>`;
     return esc(val);
   };
-  const vrows=[[t.mktcap,b.mktcap],[t.totalassets,b.totalassets],[t.totalliab,b.totalliab],[t.netassets,b.netassets],[t.shares,b.shares],[t.navps,b.navps]].filter(r=>r[1]);
+  const sharesDisp = b.shares || (sharesCount? (sharesCount>=1e9? (sharesCount/1e9).toFixed(2)+(lang==="zh"?"十亿":"B") : (sharesCount/1e6).toFixed(0)+(lang==="zh"?"百万":"M")) : "");
+  const vrows=[[t.mktcap,b.mktcap],[t.totalassets,b.totalassets],[t.totalliab,b.totalliab],[t.netassets,b.netassets],[t.shares,sharesDisp],[t.navps,curNav]].filter(r=>r[1]);
   if(verdict || vrows.length){
     h+=`<div class="sec"><div class="dlabel">${t.assetval}</div>${verdict}`+
        (vrows.length?`<div class="vlist">`+vrows.map(r=>`<div class="vrow"><span class="vk">${esc(r[0])}</span><span class="vv">${rowval(r[0],r[1])}</span></div>`).join("")+`</div>`:"")+
        `</div>`;
   }
   h+=sec(t.dividend, b.dividend?(p(b.dividend)+(b.divtrack?`<p class="muted">${esc(b.divtrack)}</p>`:"")):"");
+  if(Array.isArray(b.divschedule)&&b.divschedule.length){
+    h+=`<div class="sec"><div class="dlabel">${t.divschedule}</div>
+      <div class="ftwrap"><table class="ftable">
+        <thead><tr><th>${t.dtype}</th><th>${t.dex}</th><th>${t.dpay}</th><th class="navcol">${t.dper}</th></tr></thead>
+        <tbody>`+
+        b.divschedule.map(d=>`<tr><td>${esc(d.label)||t.dash}</td><td>${esc(d.exdate)||t.dash}</td><td>${esc(d.paydate)||t.dash}</td><td class="navcol">${esc(d.amount)||t.dash}</td></tr>`).join("")+
+        `</tbody></table></div></div>`;
+  }
   h+=sec(t.keydates, b.keydates?p(b.keydates):"");
   h+=sec(t.outlook,  b.outlook ?p(b.outlook) :"");
   h+=sec(t.analyst,  b.analyst ?p(b.analyst) :"");
@@ -753,7 +773,7 @@ async function loadBrief(c, L){
   try{
     const obj = await apiBrief(m.code, m.en, L);
     if(!briefs[c]) briefs[c]={};
-    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv8_"+c+"_"+L, cb); }
+    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv10_"+c+"_"+L, cb); }
     else { briefs[c][L]={error:true, reason:(obj&&obj.reason)||null}; }
   }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
   if(openCode===c && lang===L) renderList();
@@ -786,7 +806,7 @@ async function loadNews(c, force){
   lastUpdated = (await sget("lastUpdated")) || null;
   for(const c of watchlist){
     const n=await sget("note_"+c); if(n) notes[c]=n;
-    for(const L of ["zh","en"]){ const b=await sget("briefv8_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
+    for(const L of ["zh","en"]){ const b=await sget("briefv10_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
   }
   applyStaticText(); renderList(); renderPicker();
   refreshQuotes();   // pull fresh prices on open
