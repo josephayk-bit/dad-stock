@@ -173,6 +173,8 @@
   .vrow .vk{color:var(--ink-soft)}
   .vrow .vv{font-weight:700;font-family:var(--font-num)}
   .calcnote{font-size:11px;color:var(--ink-soft);font-weight:600;font-family:var(--font-base)}
+  .calcstar{color:var(--gold);font-weight:800}
+  .ftnote{margin-top:6px;font-size:11px;color:var(--ink-soft);font-family:var(--font-base)}
   .ftwrap{margin-top:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
   .ftable{border-collapse:collapse;width:100%;font-size:13px;font-family:var(--font-num)}
   .ftable th,.ftable td{padding:9px 11px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
@@ -486,12 +488,38 @@ function detailHTML(c){
   h+=sec(t.results, b.results ?p(b.results) :"");
   if(Array.isArray(b.financials)&&b.financials.length){
     const F=b.financials;
+    const parseAmt=(s)=>{ if(s==null) return null; let str=String(s);
+      let mult=1;
+      if(/亿/.test(str)) mult=1e8; else if(/万/.test(str)) mult=1e4;
+      else if(/b/i.test(str)) mult=1e9; else if(/m/i.test(str)) mult=1e6; else if(/k/i.test(str)) mult=1e3;
+      const n=parseFloat(str.replace(/[^0-9.\-]/g,"")); return isNaN(n)?null:n*mult; };
+    const cur=()=> (lang==="zh"?"新币":"S$");
+    const navFor=(r)=>{
+      if(r.navps) return {v:esc(r.navps),calc:false};
+      const eq=parseAmt(r.netassets), sh=parseAmt(r.shares)||parseAmt(b.shares);
+      if(eq&&sh&&sh>0){ const per=eq/sh; if(per>0.001&&per<100000) return {v:cur()+per.toFixed(2),calc:true}; }
+      return {v:t.dash,calc:false};
+    };
+    const roeFor=(r)=>{
+      if(r.roe) return {v:esc(r.roe),calc:false};
+      const pr=parseAmt(r.profit), eq=parseAmt(r.netassets);
+      if(pr&&eq&&eq>0){ const v=pr/eq*100; if(isFinite(v)&&v>-200&&v<200) return {v:v.toFixed(2)+"%",calc:true}; }
+      return {v:t.dash,calc:false};
+    };
+    let anyCalc=false;
+    const rows=F.map(r=>{
+      const nv=navFor(r), re=roeFor(r);
+      if(nv.calc||re.calc) anyCalc=true;
+      const star=`<sup class="calcstar">*</sup>`;
+      return `<tr><td>${esc(r.year)}</td><td>${esc(r.revenue)||t.dash}</td><td>${esc(r.profit)||t.dash}</td>`+
+        `<td class="navcol">${nv.v}${nv.calc?star:""}</td><td>${esc(r.dividend)||t.dash}</td>`+
+        `<td>${re.v}${re.calc?star:""}</td></tr>`;
+    }).join("");
     h+=`<div class="sec"><div class="dlabel">${t.financials}</div>
       <div class="ftwrap"><table class="ftable">
         <thead><tr><th>${t.fyear}</th><th>${t.frev}</th><th>${t.fprofit}</th><th class="navcol">${t.fnav}</th><th>${t.fdiv}</th><th>${t.froe}</th></tr></thead>
-        <tbody>`+
-        F.map(r=>`<tr><td>${esc(r.year)}</td><td>${esc(r.revenue)||t.dash}</td><td>${esc(r.profit)||t.dash}</td><td class="navcol">${esc(r.navps)||t.dash}</td><td>${esc(r.dividend)||t.dash}</td><td>${esc(r.roe)||t.dash}</td></tr>`).join("")+
-        `</tbody></table></div></div>`;
+        <tbody>`+rows+`</tbody></table></div>`+
+      (anyCalc?`<div class="ftnote">* ${t.calc}</div>`:"")+`</div>`;
   }
   if(Array.isArray(b.people)&&b.people.length){
     h+=`<div class="sec"><div class="dlabel">${t.people}</div><div class="people">`+
@@ -725,7 +753,7 @@ async function loadBrief(c, L){
   try{
     const obj = await apiBrief(m.code, m.en, L);
     if(!briefs[c]) briefs[c]={};
-    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv6_"+c+"_"+L, cb); }
+    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv7_"+c+"_"+L, cb); }
     else { briefs[c][L]={error:true, reason:(obj&&obj.reason)||null}; }
   }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
   if(openCode===c && lang===L) renderList();
@@ -758,7 +786,7 @@ async function loadNews(c, force){
   lastUpdated = (await sget("lastUpdated")) || null;
   for(const c of watchlist){
     const n=await sget("note_"+c); if(n) notes[c]=n;
-    for(const L of ["zh","en"]){ const b=await sget("briefv6_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
+    for(const L of ["zh","en"]){ const b=await sget("briefv7_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
   }
   applyStaticText(); renderList(); renderPicker();
   refreshQuotes();   // pull fresh prices on open
