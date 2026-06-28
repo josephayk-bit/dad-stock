@@ -172,6 +172,15 @@
   .vrow:last-child{border-bottom:0}
   .vrow .vk{color:var(--ink-soft)}
   .vrow .vv{font-weight:700;font-family:var(--font-num)}
+  .calcnote{font-size:11px;color:var(--ink-soft);font-weight:600;font-family:var(--font-base)}
+  .ftwrap{margin-top:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
+  .ftable{border-collapse:collapse;width:100%;font-size:13px;font-family:var(--font-num)}
+  .ftable th,.ftable td{padding:9px 11px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+  .ftable th{color:var(--ink-soft);font-weight:700;font-size:12px;letter-spacing:.02em}
+  .ftable th:first-child,.ftable td:first-child{text-align:left;position:sticky;left:0;background:var(--paper);font-weight:700}
+  .ftable tbody tr:last-child td{border-bottom:0}
+  .ftable td.navcol{color:var(--gold);font-weight:800;background:rgba(168,132,44,.07)}
+  .ftable th.navcol{color:var(--gold);background:rgba(168,132,44,.07)}
   .picklist{overflow-y:auto;padding:4px 12px 24px;-webkit-overflow-scrolling:touch}
   .pick{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper);
         border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:8px 0;min-height:66px}
@@ -285,6 +294,8 @@ const T = {
       earnings3y:"Last 3 years",revenue:"Revenue",netprofit:"Net profit",analyst:"Analyst views",
       people:"Key people & owners",pb:"P/B",navps:"NAV/share",netcash:"Cash position",
       assetval:"Asset value vs price",totalassets:"Total assets",netassets:"Net assets (book)",shares:"Shares out",
+      totalliab:"Total liabilities",calc:"calculated",
+      financials:"Year-by-year",fyear:"FY",frev:"Revenue",fprofit:"Net profit",fnav:"NAV/share",fdiv:"Dividend",froe:"ROE",
       pbtimes:"× book value",belowBook:"trading BELOW net asset value",aroundBook:"around net asset value",aboveBook:"above net asset value",
       insider:"Insider / shareholder moves",keydates:"Key dates",
       photoAdd:"Add by photo",reading:"Reading the photo…",photoNone:"No stocks found in that photo",addAll:"Add all",
@@ -309,6 +320,8 @@ const T = {
       earnings3y:"近三年业绩",revenue:"营收",netprofit:"净利",analyst:"分析师观点",
       people:"主要人物与大股东",pb:"市净率",navps:"每股净资产",netcash:"现金状况",
       assetval:"资产估值 vs 股价",totalassets:"总资产",netassets:"净资产(账面)",shares:"股本/股数",
+      totalliab:"总负债",calc:"计算值",
+      financials:"历年财务",fyear:"财年",frev:"营业额",fprofit:"净利",fnav:"每股净资产",fdiv:"派息",froe:"股本回报",
       pbtimes:"倍账面",belowBook:"低于每股净资产",aroundBook:"接近每股净资产",aboveBook:"高于每股净资产",
       insider:"内部人 / 大股东动向",keydates:"重要日期",
       photoAdd:"拍照添加",reading:"正在识别照片…",photoNone:"照片中没有识别到股票",addAll:"全部添加",
@@ -471,12 +484,14 @@ function detailHTML(c){
   let h="";
   h+=sec(t.about,   b.business?p(b.business):"");
   h+=sec(t.results, b.results ?p(b.results) :"");
-  if(Array.isArray(b.earnings3y)&&b.earnings3y.length){
-    h+=`<div class="sec"><div class="dlabel">${t.earnings3y}</div><div class="earn">`+
-       b.earnings3y.map(e=>`<div class="erow"><span class="ey">${esc(e.year)}</span>`+
-         `<span class="ev">${esc(e.revenue)||t.dash}</span><span class="ev">${esc(e.profit)||t.dash}</span></div>`).join("")+
-       `<div class="erow ehead"><span class="ey"></span><span class="ev">${t.revenue}</span><span class="ev">${t.netprofit}</span></div>`+
-       `</div></div>`;
+  if(Array.isArray(b.financials)&&b.financials.length){
+    const F=b.financials;
+    h+=`<div class="sec"><div class="dlabel">${t.financials}</div>
+      <div class="ftwrap"><table class="ftable">
+        <thead><tr><th>${t.fyear}</th><th>${t.frev}</th><th>${t.fprofit}</th><th class="navcol">${t.fnav}</th><th>${t.fdiv}</th><th>${t.froe}</th></tr></thead>
+        <tbody>`+
+        F.map(r=>`<tr><td>${esc(r.year)}</td><td>${esc(r.revenue)||t.dash}</td><td>${esc(r.profit)||t.dash}</td><td class="navcol">${esc(r.navps)||t.dash}</td><td>${esc(r.dividend)||t.dash}</td><td>${esc(r.roe)||t.dash}</td></tr>`).join("")+
+        `</tbody></table></div></div>`;
   }
   if(Array.isArray(b.people)&&b.people.length){
     h+=`<div class="sec"><div class="dlabel">${t.people}</div><div class="people">`+
@@ -491,10 +506,14 @@ function detailHTML(c){
     const cls  = pbNum<0.9 ? "below" : (pbNum<=1.1 ? "around" : "above");
     verdict = `<div class="pbline ${cls}"><span class="pbnum">${pbNum.toFixed(2)} ${t.pbtimes}</span><span class="pbword">${word}</span></div>`;
   }
-  const vrows=[[t.mktcap,b.mktcap],[t.totalassets,b.totalassets],[t.netassets,b.netassets],[t.shares,b.shares],[t.navps,b.navps]].filter(r=>r[1]);
+  const rowval=(label,val)=>{
+    if(label===t.navps && b.navpscalc && val) return esc(val)+` <span class="calcnote">${t.calc}</span>`;
+    return esc(val);
+  };
+  const vrows=[[t.mktcap,b.mktcap],[t.totalassets,b.totalassets],[t.totalliab,b.totalliab],[t.netassets,b.netassets],[t.shares,b.shares],[t.navps,b.navps]].filter(r=>r[1]);
   if(verdict || vrows.length){
     h+=`<div class="sec"><div class="dlabel">${t.assetval}</div>${verdict}`+
-       (vrows.length?`<div class="vlist">`+vrows.map(r=>`<div class="vrow"><span class="vk">${esc(r[0])}</span><span class="vv">${esc(r[1])}</span></div>`).join("")+`</div>`:"")+
+       (vrows.length?`<div class="vlist">`+vrows.map(r=>`<div class="vrow"><span class="vk">${esc(r[0])}</span><span class="vv">${rowval(r[0],r[1])}</span></div>`).join("")+`</div>`:"")+
        `</div>`;
   }
   h+=sec(t.dividend, b.dividend?(p(b.dividend)+(b.divtrack?`<p class="muted">${esc(b.divtrack)}</p>`:"")):"");
@@ -706,7 +725,7 @@ async function loadBrief(c, L){
   try{
     const obj = await apiBrief(m.code, m.en, L);
     if(!briefs[c]) briefs[c]={};
-    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv3_"+c+"_"+L, cb); }
+    if(obj && !obj.error){ const cb=cleanBrief(obj); briefs[c][L]=cb; await sset("briefv5_"+c+"_"+L, cb); }
     else { briefs[c][L]={error:true, reason:(obj&&obj.reason)||null}; }
   }catch(e){ if(!briefs[c]) briefs[c]={}; briefs[c][L]={error:true}; }
   if(openCode===c && lang===L) renderList();
@@ -739,7 +758,7 @@ async function loadNews(c, force){
   lastUpdated = (await sget("lastUpdated")) || null;
   for(const c of watchlist){
     const n=await sget("note_"+c); if(n) notes[c]=n;
-    for(const L of ["zh","en"]){ const b=await sget("briefv3_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
+    for(const L of ["zh","en"]){ const b=await sget("briefv5_"+c+"_"+L); if(b){ if(!briefs[c])briefs[c]={}; briefs[c][L]=cleanBrief(b); } }
   }
   applyStaticText(); renderList(); renderPicker();
   refreshQuotes();   // pull fresh prices on open
