@@ -2,7 +2,7 @@
 // GET  /api/brief?debug=CODE&lang=en              -> raw diagnostics (what the AI actually returned)
 // Cached in the shared DB (Redis) 30 days; refreshes after 30 days, on BRIEF_VERSION bump, or ?fresh=1.
 
-const BRIEF_VERSION = "v12";
+const BRIEF_VERSION = "v13";
 const BRIEF_TTL = 60 * 60 * 24 * 30;
 
 let _redis = undefined;
@@ -24,7 +24,7 @@ Return ONLY a JSON object, no markdown, with keys:
 "business" (1-3 sentences: what it does / main business segments),
 "people" (array of up to 4 {"role":"Chairman / CEO / Major shareholder / etc","name":"name, with stake % if a shareholder"}),
 "results" (latest reported revenue and net profit with year-on-year change, 1-2 sentences),
-"financials" (array of the last 5 fiscal years, newest first. You MUST return all 5 years. For EACH year include: "year"; "revenue"; "profit" (net profit); "navps" (NAV / book value per share THAT year); "netassets" (total shareholders' equity that year); "dividend" (per share); "roe" (percent). navps is the MOST IMPORTANT field — to get it: find that year's total shareholders' equity (netassets) and the number of shares, then navps = netassets / shares. Fill navps for every year. Example row: {"year":"FY2024","revenue":"S$140.7m","profit":"S$1.53m","navps":"S$0.42","netassets":"S$95m","dividend":"S$0.01","roe":"1.6%"}. Never fabricate; leave a single field null only if truly unavailable),
+"financials" (array of the last 5 fiscal years, newest first. You MUST return all 5 years with figures from the company's audited financial statements / annual reports (check SGX filings and annual reports directly). For EACH year include: "year"; "revenue"; "profit" (net profit); "navps" (NAV / book value per share that year); "netassets" (total shareholders' equity that year — the figure from the balance sheet); "dividend" (per share); "roe" (percent). navps is the MOST IMPORTANT field: navps = that year's total shareholders' equity divided by the total number of shares. Always provide netassets for every year. Example row: {"year":"FY2024","revenue":"S$140.7m","profit":"S$1.53m","navps":"S$0.42","netassets":"S$95m","dividend":"S$0.01","roe":"1.6%"}. Do the arithmetic; do not leave navps blank if you have equity and shares. Never fabricate — leave a field null only if the underlying figure is truly not in any filing),
 "dividend" (latest dividend per share and approx yield, 1 sentence; null if none),
 "divtrack" (short phrase on dividend track record if notable; null),
 "divschedule" (array of EVERY dividend paid in the last 12 months, newest first — NOT only the latest; a quarterly payer has ~4, half-yearly ~2, plus any special. Each {"label","exdate":"YYYY-MM-DD","paydate":"YYYY-MM-DD","amount":"S$0.54"}. Real announced dates only; [] if non-payer),
@@ -67,7 +67,7 @@ async function callModel(key, model, prompt) {
 module.exports = async function handler(req, res) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) { res.status(200).json({ error: true, reason: "no_key" }); return; }
-  const model = process.env.BRIEF_MODEL || "claude-haiku-4-5-20251001";
+  const model = process.env.BRIEF_MODEL || "claude-sonnet-4-6";
 
   const isDebug = req.method === "GET" && req.query && req.query.debug;
 
@@ -129,6 +129,21 @@ module.exports = async function handler(req, res) {
     };
 
     const result = clean(obj);
+
+    // ---- guaranteed NAV calculation: fill any blank navps from equity / shares ----
+    const parseAmt = (s) => { if (s == null) return null; let str = String(s); let m = 1;
+      if (/亿/.test(str)) m = 1e8; else if (/万/.test(str)) m = 1e4;
+      else if (/b/i.test(str)) m = 1e9; else if (/m/i.test(str)) m = 1e6; else if (/k/i.test(str)) m = 1e3;
+      const n = parseFloat(str.replace(/[^0-9.\-]/g, "")); return isNaN(n) ? null : n * m; };
+    let shares = parseAmt(result.shares);
+    if (!shares && result.netassets && result.navps) { const e = parseAmt(result.netassets), v = parseAmt(result.navps); if (e && v) shares = e / v; }
+    if (Array.isArray(result.financials)) {
+      result.financials.forEach((f) => {
+        if (f && !f.navps && f.netassets && shares) { const e = parseAmt(f.netassets); if (e && shares > 0) { const per = e / shares; if (per > 0.001 && per < 100000) f.navps = "S$" + per.toFixed(2); } }
+      });
+    }
+    if (!result.navps && result.netassets && shares) { const e = parseAmt(result.netassets); if (e && shares > 0) { result.navps = "S$" + (e / shares).toFixed(2); result.navpscalc = true; } }
+
     if (redis) { try { await redis.set(cacheKey, JSON.stringify(result), "EX", BRIEF_TTL); } catch (e) {} }
     res.status(200).json(result);
   } catch (e) {
